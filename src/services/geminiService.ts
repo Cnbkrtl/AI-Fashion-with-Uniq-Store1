@@ -12,6 +12,39 @@ export const isApiKeyAvailable = (): boolean => {
   return !!process.env.API_KEY;
 };
 
+// A centralized error handler to provide more specific feedback to the user.
+const handleApiError = (error: unknown, context: string): never => {
+  console.error(`Error calling Gemini API for ${context}:`, error);
+
+  let errorMessage = `Failed to ${context} due to an API error.`;
+
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes('api key not valid')) {
+      errorMessage = 'Your API Key is not valid. Please verify it in your environment settings.';
+    } else if (msg.includes('model `gemini-2.5-flash-image-preview` is not found')) {
+      errorMessage = 'The image editing model is not available for your project. Please ensure you have access.';
+    } else if (msg.includes('billing')) {
+      errorMessage = 'API call failed. Please ensure billing is enabled for your Google Cloud project.';
+    } else if (msg.includes('permission denied')) {
+      errorMessage = 'API permission denied. Please ensure the "Generative Language API" is enabled in your Google Cloud project.';
+    } else if (msg.includes('deadline exceeded')) {
+      errorMessage = 'The request timed out. The server may be busy, please try again.';
+    } else if (msg.includes('content has been blocked')) {
+      errorMessage = 'The request was blocked due to safety policies. Please adjust your image or prompt.';
+    } else {
+      // Extract a more concise message from a potentially long error string.
+      const coreMessage = error.message.split(':').pop()?.trim();
+      if (coreMessage) {
+        errorMessage = `API Error: ${coreMessage}`;
+      }
+    }
+  }
+
+  throw new Error(errorMessage);
+};
+
+
 // Helper function to convert File object to a base64 string
 const fileToInlineData = async (file: File): Promise<{mimeType: string, data: string}> => {
   const base64EncodedDataPromise = new Promise<string>((resolve, reject) => {
@@ -77,11 +110,7 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
     throw new Error('Background removal failed. The model response did not contain image data.');
 
   } catch (error) {
-    console.error("Error calling Gemini API for background removal:", error);
-    if (error instanceof Error && error.message.includes('API key not valid')) {
-       throw new Error('Invalid API Key. Please check your environment configuration.');
-    }
-    throw new Error('Failed to remove background due to an API error.');
+    handleApiError(error, 'remove background');
   }
 };
 
@@ -133,11 +162,7 @@ export const generateFashionImage = async (
     throw new Error('No image was generated. The model response did not contain image data.');
 
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    if (error instanceof Error && error.message.includes('API key not valid')) {
-       throw new Error('Invalid API Key. Please check your environment configuration.');
-    }
-    throw new Error('Failed to generate image due to an API error.');
+    handleApiError(error, 'generate image');
   }
 };
 
@@ -193,10 +218,6 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     throw new Error('Enhancement failed. The model response did not contain image data.');
 
   } catch (error) {
-    console.error("Error calling Gemini API for enhancement:", error);
-    if (error instanceof Error && error.message.includes('API key not valid')) {
-       throw new Error('Invalid API Key. Please check your environment configuration.');
-    }
-    throw new Error('Failed to enhance image due to an API error.');
+    handleApiError(error, 'enhance image');
   }
 };
