@@ -174,7 +174,6 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
         ) : null}
       </div>
       
-      {/* --- START: FIX for Control Placement --- */}
       {/* The controls are now outside the image container, as a direct child of the flex-col layout. */}
       {imageUrl && !showLoading && onZoomChange && (
           <div className="self-center bg-gray-900/70 backdrop-blur-sm rounded-full p-1 flex items-center gap-1 shadow-lg">
@@ -203,7 +202,6 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
               </button>
           </div>
       )}
-      {/* --- END: FIX for Control Placement --- */}
 
       {imageUrl && onEnhanceClick && (
         <button

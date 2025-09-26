@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ImageUploader } from './components/ImageUploader';
 import { TextInput } from './components/TextInput';
 import { Spinner } from './components/Spinner';
@@ -125,7 +125,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 
 const App: React.FC = () => {
-  const [isApiConfigured, setIsApiConfigured] = useState<boolean>(true);
+  const [isApiConfigured] = useState<boolean>(isApiKeyAvailable());
   const [appSettings, setAppSettings] = useState<AppSettings>(loadInitialSettings);
   const [sourceImage, setSourceImage] = useState<File | null>(null);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
@@ -145,11 +145,6 @@ const App: React.FC = () => {
   const [rotation, setRotation] = useState<number>(0);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   
-  useEffect(() => {
-    // Check for the API key on initial render to avoid a blank screen
-    setIsApiConfigured(isApiKeyAvailable());
-  }, []);
-
   const setExportSettings = (updater: React.SetStateAction<ExportSettings>) => {
     setAppSettings(prev => {
         const newExportSettings = typeof updater === 'function' ? updater(prev.exportSettings) : updater;
