@@ -165,7 +165,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
         {showLoading && (
           <div className="absolute inset-0 bg-gray-900/80 flex flex-col items-center justify-center text-gray-400 z-10 p-4 text-center animate-pulse-bg">
             <Spinner className="w-10 h-10" />
-            <p className="mt-4 text-lg">{isEnhancing ? 'Enhancing your image...' : 'Generating your image...'}</p>
+            <p className="mt-4 text-lg">{isEnhancing ? 'Finalizing your image...' : 'Generating your image...'}</p>
             <div className="h-5 mt-2 overflow-hidden">
               {loadingMessage && (
                 <p key={loadingMessage} className="text-sm text-gray-400 animate-fade-in-out">
@@ -242,10 +242,10 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
         >
           {isEnhancing ? (
             <>
-              <Spinner /> Enhancing...
+              <Spinner /> Finalizing...
             </>
           ) : (
-            'Enhance & Download'
+            'Finalize & Export'
           )}
         </button>
       )}

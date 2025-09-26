@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LockIcon } from './icons/LockIcon';
-import type { ExportSettings, ColorGradingSettings, ResolutionSettings } from '../App';
+import type { ExportSettings, ColorGradingSettings, ResolutionSettings, EnhancementSettings } from '../App';
+import { Spinner } from './Spinner';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface ExportModalProps {
   baseImageUrl: string | null;
   settings: ExportSettings;
   setSettings: React.Dispatch<React.SetStateAction<ExportSettings>>;
+  isProcessing: boolean;
 }
 
 const getCanvasFilter = (settings: ColorGradingSettings): string => {
@@ -39,11 +41,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   baseImageUrl,
   settings,
   setSettings,
+  isProcessing,
 }) => {
   const [originalDimensions, setOriginalDimensions] = useState<{ width: number; height: number } | null>(null);
 
   const updateSetting = <K extends keyof ExportSettings>(key: K, value: ExportSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateEnhancement = <K extends keyof EnhancementSettings>(key: K, value: EnhancementSettings[K]) => {
+    setSettings(prev => ({
+      ...prev,
+      enhancement: {
+        ...prev.enhancement,
+        [key]: value,
+      },
+    }));
   };
 
   const updateResolution = <K extends keyof ResolutionSettings>(key: K, value: ResolutionSettings[K]) => {
@@ -129,7 +142,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-gray-800/90 rounded-2xl shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
         <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
-          <h2 className="text-xl font-bold text-cyan-400">Enhance & Export Image</h2>
+          <h2 className="text-xl font-bold text-cyan-400">Finalize & Export Image</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-3xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-700 transition-colors">&times;</button>
         </header>
 
@@ -139,7 +152,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             {baseImageUrl ? (
                 <img
                     src={baseImageUrl}
-                    alt="Enhanced Preview"
+                    alt="Final Preview"
                     className="max-w-full max-h-full object-contain transition-all duration-300"
                     style={{ filter: getCanvasFilter(settings.colorGrading) }}
                 />
@@ -150,6 +163,27 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           
           {/* Settings Column */}
           <div className="flex flex-col gap-4 overflow-y-auto pr-2">
+            
+            <div className="bg-gray-700/40 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold text-purple-400 mb-4">Fine-Tuning</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <label htmlFor="denoise-toggle" className="font-medium text-gray-300">Denoise</label>
+                    <button onClick={() => updateEnhancement('denoise', !settings.enhancement.denoise)} className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors ${settings.enhancement.denoise ? 'bg-cyan-500' : 'bg-gray-600'}`}>
+                        <span className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform ${settings.enhancement.denoise ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                </div>
+                 <div>
+                    <label htmlFor="textureBoost" className="text-sm flex justify-between"><span>Texture Boost</span> <span>{settings.enhancement.textureBoost}</span></label>
+                    <input id="textureBoost" type="range" min="0" max="100" value={settings.enhancement.textureBoost} onChange={e => updateEnhancement('textureBoost', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"/>
+                  </div>
+                  <div>
+                    <label htmlFor="clarity" className="text-sm flex justify-between"><span>Clarity</span> <span>{settings.enhancement.clarity}</span></label>
+                    <input id="clarity" type="range" min="0" max="100" value={settings.enhancement.clarity} onChange={e => updateEnhancement('clarity', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"/>
+                  </div>
+              </div>
+            </div>
+
             <div className="bg-gray-700/40 p-4 rounded-lg">
               <h3 className="text-lg font-semibold text-purple-400 mb-3">Export Format</h3>
               <div className="grid grid-cols-2 gap-2 mb-3">
@@ -223,8 +257,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         </div>
 
         <footer className="flex items-center justify-end p-4 border-t border-gray-700 bg-gray-800 flex-shrink-0">
-            <button onClick={onClose} className="px-4 py-2 text-gray-300 rounded hover:bg-gray-700 mr-2 transition-colors">Cancel</button>
-            <button onClick={onDownload} className="px-6 py-2 bg-cyan-500 text-gray-900 font-bold rounded hover:bg-cyan-400 transition-transform transform hover:scale-105">Download Image</button>
+            <button onClick={onClose} disabled={isProcessing} className="px-4 py-2 text-gray-300 rounded hover:bg-gray-700 mr-2 transition-colors disabled:opacity-50">Cancel</button>
+            <button onClick={onDownload} disabled={isProcessing} className="px-6 py-2 bg-cyan-500 text-gray-900 font-bold rounded hover:bg-cyan-400 transition-transform transform hover:scale-105 w-40 flex items-center justify-center disabled:bg-gray-600 disabled:cursor-not-allowed">
+              {isProcessing ? <Spinner /> : 'Download Image'}
+            </button>
         </footer>
       </div>
     </div>

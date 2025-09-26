@@ -22,6 +22,12 @@ export interface ColorGradingSettings {
   warmth: number;
 }
 
+export interface EnhancementSettings {
+  denoise: boolean;
+  textureBoost: number;
+  clarity: number;
+}
+
 // FIX: Define and export TransformationState to be used by ImageDisplay and the useHistory hook.
 export interface TransformationState {
   zoom: number;
@@ -41,6 +47,7 @@ export interface ExportSettings {
   quality: number;
   colorGrading: ColorGradingSettings;
   resolution: ResolutionSettings;
+  enhancement: EnhancementSettings;
 }
 
 export interface AppSettings {
@@ -81,6 +88,11 @@ export const getDefaultSettings = (): AppSettings => ({
       width: null,
       height: null,
       aspectRatioLocked: true,
+    },
+    enhancement: {
+      denoise: true,
+      textureBoost: 50,
+      clarity: 50,
     }
   }
 });
@@ -107,6 +119,10 @@ const loadInitialSettings = (): AppSettings => {
         resolution: {
           ...defaultSettings.exportSettings.resolution,
           ...(parsed.exportSettings?.resolution || {}),
+        },
+        enhancement: {
+          ...defaultSettings.exportSettings.enhancement,
+          ...(parsed.exportSettings?.enhancement || {}),
         }
       }
     };
@@ -166,7 +182,6 @@ const App: React.FC = () => {
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
   const [isRemovingBackground, setIsRemovingBackground] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [promptIdeaIndex, setPromptIdeaIndex] = useState(0);
@@ -295,193 +310,125 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const handleEnhance = useCallback(async () => {
+  const handleFinalizeAndDownload = useCallback(async () => {
     if (!generatedImage) {
-      setError('No generated image to enhance.');
+      setError('No generated image to finalize.');
       return;
     }
   
     setIsEnhancing(true);
     setError(null);
+    setShowExportModal(false); // Close modal while processing
   
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = generatedImage;
-    img.onload = async () => {
-      try {
-        const container = document.querySelector('.generated-image-container');
-        if (!container) {
-          throw new Error("Could not find image container for processing.");
-        }
-  
-        const canvas = document.createElement('canvas');
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-        const ctx = canvas.getContext('2d');
-  
-        if (!ctx) {
-          throw new Error("Could not get canvas context.");
-        }
-  
-        // Calculate the initial rendered size of the image to fit the container
-        const containerAspect = canvas.width / canvas.height;
-        const imageAspect = img.naturalWidth / img.naturalHeight;
-        let renderedWidth, renderedHeight;
-  
-        if (imageAspect > containerAspect) {
-          renderedWidth = canvas.width;
-          renderedHeight = canvas.width / imageAspect;
-        } else {
-          renderedHeight = canvas.height;
-          renderedWidth = canvas.height * imageAspect;
-        }
-  
-        // FIX: Apply transformations from the unified transform state object.
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.translate(transform.position.x, transform.position.y);
-        ctx.rotate((transform.rotation * Math.PI) / 180);
-        ctx.scale(transform.zoom, transform.zoom);
-  
-        // Draw the image centered on the transformed context
-        ctx.drawImage(img, -renderedWidth / 2, -renderedHeight / 2, renderedWidth, renderedHeight);
-        
-        const editedImageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-  
-        const enhancedImageUrl = await enhanceImage(editedImageDataUrl);
-        setEnhancedImage(enhancedImageUrl);
-        setShowExportModal(true);
-      } catch (err) {
-        console.error("Enhancement failed:", err);
-        setError(err instanceof Error ? err.message : 'Failed to enhance image.');
-      } finally {
-        setIsEnhancing(false);
-      }
-    };
-    img.onerror = () => {
-      setError('Failed to load generated image for enhancement.');
-      setIsEnhancing(false);
-    };
-  }, [generatedImage, transform]);
-  
-  const handleFinalDownload = () => {
-    if (!enhancedImage) {
-      setError('No enhanced image available to download.');
-      return;
-    }
-    
     try {
-      const allSettings = loadInitialSettings();
-      allSettings.exportSettings = appSettings.exportSettings;
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(allSettings));
-    } catch (error) {
-      console.error("Could not save settings:", error);
-    }
+      // 1. Save current settings as the new default for next time
+      const latestSettings = { ...appSettings }; // Capture settings at time of click
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(latestSettings));
 
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        setError('Could not process image for download.');
-        setShowExportModal(false);
-        return;
-      }
-      
-      const originalWidth = img.width;
-      const originalHeight = img.height;
-      let targetWidth = originalWidth;
-      let targetHeight = originalHeight;
-      const originalAspectRatio = originalWidth / originalHeight;
-      let requiresCropping = false;
-
-      switch (appSettings.exportSettings.resolution.preset) {
-        case 'hd':
-          if (originalAspectRatio >= 1) { // Landscape or square
-            targetWidth = 1920;
-            targetHeight = 1920 / originalAspectRatio;
-          } else { // Portrait
-            targetHeight = 1920;
-            targetWidth = 1920 * originalAspectRatio;
-          }
-          break;
-        case '4k':
-          if (originalAspectRatio >= 1) { // Landscape or square
-            targetWidth = 3840;
-            targetHeight = 3840 / originalAspectRatio;
-          } else { // Portrait
-            targetHeight = 3840;
-            targetWidth = 3840 * originalAspectRatio;
-          }
-          break;
-        case 'square':
-          targetWidth = 1080;
-          targetHeight = 1080;
-          requiresCropping = true;
-          break;
-        case 'portrait':
-          targetWidth = 1080;
-          targetHeight = 1920;
-          requiresCropping = true;
-          break;
-        case 'landscape':
-          targetWidth = 1920;
-          targetHeight = 1080;
-          requiresCropping = true;
-          break;
-        case 'custom':
-          targetWidth = appSettings.exportSettings.resolution.width || originalWidth;
-          targetHeight = appSettings.exportSettings.resolution.height || originalHeight;
-          if (Math.abs((targetWidth / targetHeight) - originalAspectRatio) > 0.01) {
-            requiresCropping = true;
-          }
-          break;
-        case 'original':
-        default:
-          break;
-      }
-
-      canvas.width = Math.round(targetWidth);
-      canvas.height = Math.round(targetHeight);
-      
-      ctx.filter = getCanvasFilter(appSettings.exportSettings.colorGrading);
-
-      if (requiresCropping) {
-        const canvasAspectRatio = canvas.width / canvas.height;
-        let sx = 0, sy = 0, sWidth = originalWidth, sHeight = originalHeight;
-
-        if (originalAspectRatio > canvasAspectRatio) {
-          sWidth = originalHeight * canvasAspectRatio;
-          sx = (originalWidth - sWidth) / 2;
-        } else if (originalAspectRatio < canvasAspectRatio) {
-          sHeight = originalWidth / canvasAspectRatio;
-          sy = (originalHeight - sHeight) / 2;
+      // 2. Enhance the image using the fine-tuning settings
+      const enhancedImageUrl = await enhanceImage(generatedImage, latestSettings.exportSettings.enhancement);
+  
+      // 3. Process the enhanced image for final export (resizing, color grading, format)
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setError('Could not process image for download.');
+          setIsEnhancing(false);
+          return;
         }
-        ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const originalWidth = img.width;
+        const originalHeight = img.height;
+        let targetWidth = originalWidth;
+        let targetHeight = originalHeight;
+        const originalAspectRatio = originalWidth / originalHeight;
+        let requiresCropping = false;
+  
+        switch (latestSettings.exportSettings.resolution.preset) {
+          case 'hd':
+            targetWidth = (originalAspectRatio >= 1) ? 1920 : 1080;
+            targetHeight = (originalAspectRatio >= 1) ? 1920 / originalAspectRatio : 1920;
+            break;
+          case '4k':
+            targetWidth = (originalAspectRatio >= 1) ? 3840 : 2160;
+            targetHeight = (originalAspectRatio >= 1) ? 3840 / originalAspectRatio : 3840;
+            break;
+          case 'square':
+            targetWidth = 1080;
+            targetHeight = 1080;
+            requiresCropping = true;
+            break;
+          case 'portrait':
+            targetWidth = 1080;
+            targetHeight = 1920;
+            requiresCropping = true;
+            break;
+          case 'landscape':
+            targetWidth = 1920;
+            targetHeight = 1080;
+            requiresCropping = true;
+            break;
+          case 'custom':
+            targetWidth = latestSettings.exportSettings.resolution.width || originalWidth;
+            targetHeight = latestSettings.exportSettings.resolution.height || originalHeight;
+            if (Math.abs((targetWidth / targetHeight) - originalAspectRatio) > 0.01) {
+              requiresCropping = true;
+            }
+            break;
+          case 'original':
+          default:
+            break;
+        }
+  
+        canvas.width = Math.round(targetWidth);
+        canvas.height = Math.round(targetHeight);
+        
+        ctx.filter = getCanvasFilter(latestSettings.exportSettings.colorGrading);
+  
+        if (requiresCropping) {
+          const canvasAspectRatio = canvas.width / canvas.height;
+          let sx = 0, sy = 0, sWidth = originalWidth, sHeight = originalHeight;
+  
+          if (originalAspectRatio > canvasAspectRatio) {
+            sWidth = originalHeight * canvasAspectRatio;
+            sx = (originalWidth - sWidth) / 2;
+          } else if (originalAspectRatio < canvasAspectRatio) {
+            sHeight = originalWidth / canvasAspectRatio;
+            sy = (originalHeight - sHeight) / 2;
+          }
+          ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+        } else {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+  
+        let dataUrl: string;
+        let filename: string;
+  
+        if (latestSettings.exportSettings.format === 'png') {
+          dataUrl = canvas.toDataURL('image/png');
+          filename = 'ai-fashion-photoshoot-final.png';
+        } else {
+          const qualityValue = latestSettings.exportSettings.quality / 100;
+          dataUrl = canvas.toDataURL('image/jpeg', qualityValue);
+          filename = 'ai-fashion-photoshoot-final.jpeg';
+        }
+        
+        downloadImage(dataUrl, filename);
+      };
+      img.onerror = () => {
+          setError('Failed to load enhanced image for final processing.');
       }
-
-      let dataUrl: string;
-      let filename: string;
-
-      if (appSettings.exportSettings.format === 'png') {
-        dataUrl = canvas.toDataURL('image/png');
-        filename = 'ai-fashion-photoshoot-enhanced.png';
-      } else {
-        const qualityValue = appSettings.exportSettings.quality / 100;
-        dataUrl = canvas.toDataURL('image/jpeg', qualityValue);
-        filename = 'ai-fashion-photoshoot-enhanced.jpeg';
-      }
-      
-      downloadImage(dataUrl, filename);
-      setShowExportModal(false);
-    };
-    img.onerror = () => {
-        setError('Failed to load enhanced image for conversion.');
-        setShowExportModal(false);
+      img.src = enhancedImageUrl;
+  
+    } catch (err) {
+      console.error("Finalization failed:", err);
+      setError(err instanceof Error ? err.message : 'Failed to finalize and download image.');
+    } finally {
+      setIsEnhancing(false);
     }
-    img.src = enhancedImage;
-  };
+  }, [generatedImage, appSettings]);
 
   const handleSaveSettings = (newSettings: AppSettings) => {
     setAppSettings(newSettings);
@@ -617,7 +564,7 @@ const App: React.FC = () => {
               imageUrl={generatedImage} 
               isLoading={isLoading}
               isEnhancing={isEnhancing}
-              onEnhanceClick={handleEnhance}
+              onEnhanceClick={() => setShowExportModal(true)}
               transform={transform}
               onTransformChange={setTransform}
               onUndo={undoTransform}
@@ -633,10 +580,11 @@ const App: React.FC = () => {
       <ExportModal
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
-        onDownload={handleFinalDownload}
-        baseImageUrl={enhancedImage}
+        onDownload={handleFinalizeAndDownload}
+        baseImageUrl={generatedImage}
         settings={appSettings.exportSettings}
         setSettings={setExportSettings}
+        isProcessing={isEnhancing}
       />
       
       <SettingsModal

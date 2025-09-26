@@ -1,4 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
+import type { EnhancementSettings } from '../App';
 
 if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set.");
@@ -167,7 +168,10 @@ export const generateFashionImage = async (
   }
 };
 
-export const enhanceImage = async (base64ImageDataUri: string): Promise<string> => {
+export const enhanceImage = async (
+  base64ImageDataUri: string,
+  settings: EnhancementSettings
+): Promise<string> => {
   const model = 'gemini-2.5-flash-image-preview';
 
   const [header, data] = base64ImageDataUri.split(',');
@@ -186,10 +190,27 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     }
   };
 
-  // Revised prompt to focus on quality improvement without triggering identity policies.
-  const textPart = {
-    text: "Enhance this image by upscaling it to a higher resolution and improving its photorealism. Focus on refining details like textures, skin tones, lighting, and shadows to achieve a professional, high-quality photographic look. It is critical to preserve all original elements of the image—do not change the person's appearance, clothing, pose, or the background. The objective is strictly to improve visual quality and fidelity without altering the content.",
-  };
+  // Build a dynamic, highly specific prompt based on user settings to prevent blur.
+  let enhancementPrompt = "Critically analyze this image and perform a high-fidelity enhancement. Your primary goal is to increase sharpness, clarity, and detail to achieve a professional, high-quality photographic look. The final image must be crisp and in sharp focus. Preserve all original elements—do not change the person's appearance, clothing, pose, or the background.\n";
+
+  // Add specific instructions based on settings
+  if (settings.denoise) {
+    enhancementPrompt += "- Apply subtle digital noise reduction, especially in shadow areas, without sacrificing essential texture.\n";
+  }
+  if (settings.clarity > 0) {
+    const clarityLevel = settings.clarity < 33 ? 'subtly' : settings.clarity < 66 ? 'moderately' : 'significantly';
+    enhancementPrompt += `- ${clarityLevel} increase the overall clarity and crispness of the image.\n`;
+  }
+  if (settings.textureBoost > 0) {
+    const textureLevel = settings.textureBoost < 33 ? 'subtly' : settings.textureBoost < 66 ? 'moderately' : 'significantly';
+    enhancementPrompt += `- ${textureLevel} enhance the definition of fine textures in elements like clothing fabric, hair, and environmental surfaces.\n`;
+  }
+
+  // Add a critical negative constraint to forbid blurriness.
+  enhancementPrompt += "\nCRITICAL CONSTRAINT: Under no circumstances should you add blur, haze, soft focus, or dream-like effects. The output image must be sharper and clearer than the input image.";
+
+
+  const textPart = { text: enhancementPrompt };
 
   try {
     const response = await ai.models.generateContent({
