@@ -28,7 +28,6 @@ export interface EnhancementSettings {
   clarity: number;
 }
 
-// FIX: Define and export TransformationState to be used by ImageDisplay and the useHistory hook.
 export interface TransformationState {
   zoom: number;
   rotation: number;
@@ -186,7 +185,6 @@ const App: React.FC = () => {
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [promptIdeaIndex, setPromptIdeaIndex] = useState(0);
 
-  // FIX: Refactor image editing state to use the useHistory hook for undo/redo functionality.
   const {
     state: transform,
     setState: setTransform,
@@ -291,7 +289,6 @@ const App: React.FC = () => {
     try {
       const imageUrl = await generateFashionImage(sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style);
       setGeneratedImage(imageUrl);
-      // FIX: Reset editing transformations for the new image using the history hook.
       resetTransform(initialTransformState);
     } catch (err) {
       console.error(err);
@@ -301,14 +298,47 @@ const App: React.FC = () => {
     }
   }, [sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style, resetTransform]);
 
-  const downloadImage = (dataUrl: string, filename: string) => {
+  const downloadImage = useCallback((dataUrl: string, filename: string) => {
     const link = document.createElement('a');
     link.href = dataUrl;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, []);
+
+  const applyTransformationsToImage = useCallback((
+    baseImageUrl: string,
+    transformState: TransformationState
+  ): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Could not get canvas context for transformation.'));
+        }
+        
+        const { naturalWidth: w, naturalHeight: h } = img;
+        const { zoom, rotation, position } = transformState;
+        
+        canvas.width = w;
+        canvas.height = h;
+
+        ctx.translate(w / 2, h / 2);
+        ctx.translate(position.x, position.y);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.scale(zoom, zoom);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        
+        // Use PNG to preserve transparency if background was removed
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('Failed to load image for applying transformations.'));
+      img.src = baseImageUrl;
+    });
+  }, []);
 
   const handleFinalizeAndDownload = useCallback(async () => {
     if (!generatedImage) {
@@ -323,13 +353,22 @@ const App: React.FC = () => {
     try {
       const latestSettings = { ...appSettings };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(latestSettings));
+
+      // Step 1: Apply user edits (zoom, rotate, pan) before enhancement
+      const editedImageDataUrl = await applyTransformationsToImage(generatedImage, transform);
   
-      const enhancedImageUrl = await enhanceImage(generatedImage, latestSettings.exportSettings.enhancement);
+      // Step 2: Enhance the edited image
+      const enhancedImageUrl = await enhanceImage(editedImageDataUrl, latestSettings.exportSettings.enhancement);
   
-      // Wrap the async image loading and canvas processing in a promise
+      // Step 3: Apply final processing and trigger download in a robust promise
       await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Image loading timed out. The enhancement API may have returned an invalid image."));
+        }, 15000); // 15s timeout
+
         const img = new Image();
         img.onload = () => {
+          clearTimeout(timeout);
           try {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -423,14 +462,19 @@ const App: React.FC = () => {
               filename = 'ai-fashion-photoshoot-final.jpeg';
             }
             
+            if (!dataUrl || dataUrl === 'data:,') {
+              return reject(new Error("Final processing failed: generated empty image data."));
+            }
+
             downloadImage(dataUrl, filename);
-            resolve(); // Signal completion
+            resolve();
           } catch (e) {
-            reject(e); // Propagate canvas errors
+            reject(e);
           }
         };
         img.onerror = () => {
-          reject(new Error('Failed to load enhanced image for final processing.'));
+          clearTimeout(timeout);
+          reject(new Error('Failed to load the enhanced image for final processing. It might be corrupt.'));
         };
         img.src = enhancedImageUrl;
       });
@@ -441,7 +485,7 @@ const App: React.FC = () => {
     } finally {
       setIsEnhancing(false);
     }
-  }, [generatedImage, appSettings]);
+  }, [generatedImage, appSettings, transform, applyTransformationsToImage, downloadImage]);
 
   const handleSaveSettings = (newSettings: AppSettings) => {
     setAppSettings(newSettings);
@@ -571,7 +615,6 @@ const App: React.FC = () => {
           {/* Display Column */}
           <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
             <ImageDisplay title="Original Image" imageUrl={sourceImageUrl} />
-            {/* FIX: Update ImageDisplay props to pass the transform state and history handlers. */}
             <ImageDisplay 
               title="AI Generated Image" 
               imageUrl={generatedImage} 
