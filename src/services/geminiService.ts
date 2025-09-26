@@ -1,7 +1,6 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// FIX: Adhere to the coding guidelines for API key retrieval.
-// The API key must be obtained exclusively from `process.env.API_KEY`.
+// FIX: Use `process.env.API_KEY` to initialize the GoogleGenAI client as per the guidelines. This resolves the TypeScript error related to `import.meta.env`.
 if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set.");
 }
@@ -54,6 +53,7 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
+      // FIX: The presence of `part.inlineData` is a sufficient check.
       if (part.inlineData) {
         const base64ImageBytes: string = part.inlineData.data;
         const mimeType = part.inlineData.mimeType;
@@ -113,6 +113,7 @@ export const generateFashionImage = async (
 
     // Find the image part in the response
     for (const part of response.candidates?.[0]?.content?.parts || []) {
+      // FIX: The presence of `part.inlineData` is a sufficient check.
       if (part.inlineData) {
         const base64ImageBytes: string = part.inlineData.data;
         const mimeType = part.inlineData.mimeType;
@@ -173,6 +174,7 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
+      // FIX: The presence of `part.inlineData` is a sufficient check.
       if (part.inlineData) {
         const base64ImageBytes: string = part.inlineData.data;
         const responseMimeType = part.inlineData.mimeType;
