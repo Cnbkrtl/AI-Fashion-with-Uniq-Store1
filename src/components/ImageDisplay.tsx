@@ -16,13 +16,13 @@ interface ImageDisplayProps {
   isLoading?: boolean;
   isEnhancing?: boolean;
   onEnhanceClick?: () => void;
-  transform: TransformationState;
-  onTransformChange: (newTransform: TransformationState) => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onReset: () => void;
+  transform?: TransformationState;
+  onTransformChange?: (newTransform: TransformationState) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onReset?: () => void;
 }
 
 const GENERATION_MESSAGES = [
@@ -50,7 +50,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   isLoading = false,
   isEnhancing = false,
   onEnhanceClick,
-  transform,
+  transform: transformProp,
   onTransformChange,
   onUndo,
   onRedo,
@@ -65,6 +65,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const messageIntervalRef = useRef<number | null>(null);
 
+  const transform = transformProp ?? { zoom: 1, rotation: 0, position: { x: 0, y: 0 } };
   const { zoom, rotation, position } = transform;
   
   // Local state for smooth dragging without flooding history
@@ -127,7 +128,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   };
 
   const handleMouseUp = () => {
-    if (isDragging) {
+    if (isDragging && onTransformChange) {
       // Commit the final position to the history
       onTransformChange({ ...transform, position: transientPosition });
     }
@@ -135,11 +136,15 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   };
   
   const handleRotate = () => {
-    onTransformChange({ ...transform, rotation: (rotation + 90) % 360 });
+    if (onTransformChange) {
+        onTransformChange({ ...transform, rotation: (rotation + 90) % 360 });
+    }
   };
   
   const handleZoomChange = (newZoom: number) => {
-    onTransformChange({ ...transform, zoom: newZoom });
+    if (onTransformChange) {
+        onTransformChange({ ...transform, zoom: newZoom });
+    }
   };
 
 
@@ -175,7 +180,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
             className="object-contain w-full h-full transition-transform duration-200"
             style={{
                 transform: `translate(${displayPosition.x}px, ${displayPosition.y}px) scale(${zoom}) rotate(${rotation}deg)`,
-                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                cursor: zoom > 1 && onTransformChange ? (isDragging ? 'grabbing' : 'grab') : 'default',
                 maxWidth: '100%',
                 maxHeight: '100%',
             }}
@@ -191,7 +196,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
       </div>
       
       {/* The controls are now outside the image container, as a direct child of the flex-col layout. */}
-      {imageUrl && !showLoading && (
+      {imageUrl && !showLoading && onTransformChange && onUndo && onRedo && onReset && (
           <div className="self-center bg-gray-900/70 backdrop-blur-sm rounded-full p-1 flex items-center gap-1 shadow-lg">
               <button onClick={onUndo} disabled={!canUndo} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors disabled:text-gray-600 disabled:hover:bg-transparent disabled:cursor-not-allowed" aria-label="Undo">
                   <UndoIcon className="w-5 h-5" />
