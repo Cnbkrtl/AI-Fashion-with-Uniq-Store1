@@ -10,6 +10,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { MagicWandIcon } from './components/icons/MagicWandIcon';
 import { ApiErrorDisplay } from './components/ApiErrorDisplay';
 import { LightbulbIcon } from './components/icons/LightbulbIcon';
+import { useHistory } from './hooks/useHistory';
 
 // Centralized type definitions for settings
 export interface ColorGradingSettings {
@@ -38,6 +39,19 @@ export interface AppSettings {
   defaultScenePrompt: string;
   exportSettings: ExportSettings;
 }
+
+// Transformation state for image editing
+export interface TransformationState {
+  zoom: number;
+  rotation: number;
+  position: { x: number; y: number };
+}
+
+const initialTransformationState: TransformationState = {
+  zoom: 1,
+  rotation: 0,
+  position: { x: 0, y: 0 },
+};
 
 const SETTINGS_STORAGE_KEY = 'aiFashionStudioAppSettings';
 
@@ -140,10 +154,16 @@ const App: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
-  // State for image editing tools
-  const [zoom, setZoom] = useState<number>(1);
-  const [rotation, setRotation] = useState<number>(0);
-  const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // State for image editing tools with undo/redo history
+  const {
+    state: transform,
+    setState: setTransform,
+    undo: undoTransform,
+    redo: redoTransform,
+    reset: resetTransform,
+    canUndo: canUndoTransform,
+    canRedo: canRedoTransform,
+  } = useHistory<TransformationState>(initialTransformationState);
   
   const setExportSettings = (updater: React.SetStateAction<ExportSettings>) => {
     setAppSettings(prev => {
@@ -214,16 +234,14 @@ const App: React.FC = () => {
       const imageUrl = await generateFashionImage(sourceImage, scenePrompt);
       setGeneratedImage(imageUrl);
       // Reset editing transformations for the new image
-      setZoom(1);
-      setRotation(0);
-      setPosition({ x: 0, y: 0 });
+      resetTransform(initialTransformationState);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
-  }, [sourceImage, scenePrompt]);
+  }, [sourceImage, scenePrompt, resetTransform]);
 
   const downloadImage = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -282,11 +300,11 @@ const App: React.FC = () => {
         // 1. Move the origin to the center of the canvas
         ctx.translate(canvas.width / 2, canvas.height / 2);
         // 2. Apply the user's pan, scaled to full resolution
-        ctx.translate(position.x * scaleFactor, position.y * scaleFactor);
+        ctx.translate(transform.position.x * scaleFactor, transform.position.y * scaleFactor);
         // 3. Apply rotation
-        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.rotate((transform.rotation * Math.PI) / 180);
         // 4. Apply zoom
-        ctx.scale(zoom, zoom);
+        ctx.scale(transform.zoom, transform.zoom);
         
         // Draw the image centered on the transformed origin
         // The image itself fills the entire canvas, leaving no empty space.
@@ -309,7 +327,7 @@ const App: React.FC = () => {
       setError('Failed to load generated image for enhancement.');
       setIsEnhancing(false);
     };
-  }, [generatedImage, zoom, rotation, position]);
+  }, [generatedImage, transform]);
   
   const handleFinalDownload = () => {
     if (!enhancedImage) {
@@ -526,12 +544,13 @@ const App: React.FC = () => {
               isLoading={isLoading}
               isEnhancing={isEnhancing}
               onEnhanceClick={handleEnhance}
-              zoom={zoom}
-              onZoomChange={setZoom}
-              rotation={rotation}
-              onRotationChange={setRotation}
-              position={position}
-              onPositionChange={setPosition}
+              transform={transform}
+              onTransformChange={setTransform}
+              onUndo={undoTransform}
+              onRedo={redoTransform}
+              canUndo={canUndoTransform}
+              canRedo={canRedoTransform}
+              onReset={() => resetTransform(initialTransformationState)}
             />
           </div>
         </div>

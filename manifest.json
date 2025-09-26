@@ -1,0 +1,23 @@
+{
+  "short_name": "AI Fashion",
+  "name": "One-Prompt AI Fashion Studio",
+  "description": "An AI-powered photo editing application that generates new editorial-style images. It maintains the model's identity and clothing from a source image while allowing customization of the background and pose through text prompts.",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#111827",
+  "background_color": "#111827"
+}

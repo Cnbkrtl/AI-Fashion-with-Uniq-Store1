@@ -5,6 +5,9 @@ import { ZoomInIcon } from './icons/ZoomInIcon';
 import { ZoomOutIcon } from './icons/ZoomOutIcon';
 import { RotateIcon } from './icons/RotateIcon';
 import { ResetZoomIcon } from './icons/ResetZoomIcon';
+import { UndoIcon } from './icons/UndoIcon';
+import { RedoIcon } from './icons/RedoIcon';
+import { TransformationState } from '../App';
 
 
 interface ImageDisplayProps {
@@ -13,12 +16,13 @@ interface ImageDisplayProps {
   isLoading?: boolean;
   isEnhancing?: boolean;
   onEnhanceClick?: () => void;
-  zoom?: number;
-  onZoomChange?: (zoom: number) => void;
-  rotation?: number;
-  onRotationChange?: (rotation: number) => void;
-  position?: { x: number; y: number };
-  onPositionChange?: (position: { x: number; y: number }) => void;
+  transform: TransformationState;
+  onTransformChange: (newTransform: TransformationState) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onReset: () => void;
 }
 
 const GENERATION_MESSAGES = [
@@ -46,12 +50,13 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   isLoading = false,
   isEnhancing = false,
   onEnhanceClick,
-  zoom,
-  onZoomChange,
-  rotation,
-  onRotationChange,
-  position,
-  onPositionChange,
+  transform,
+  onTransformChange,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  onReset
 }) => {
   const showLoading = isLoading || isEnhancing;
 
@@ -59,6 +64,16 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [loadingMessage, setLoadingMessage] = useState<string>('');
   const messageIntervalRef = useRef<number | null>(null);
+
+  const { zoom, rotation, position } = transform;
+  
+  // Local state for smooth dragging without flooding history
+  const [transientPosition, setTransientPosition] = useState(position);
+
+  // Sync transient position when history changes (undo/redo)
+  useEffect(() => {
+    setTransientPosition(position);
+  }, [position]);
 
   useEffect(() => {
     if (messageIntervalRef.current) {
@@ -92,19 +107,19 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
 
 
   const handleMouseDown = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (onPositionChange && zoom && zoom > 1) {
+    if (onTransformChange && zoom > 1) {
       e.preventDefault();
       setIsDragging(true);
       setDragStart({
-        x: e.clientX - (position?.x || 0),
-        y: e.clientY - (position?.y || 0),
+        x: e.clientX - transientPosition.x,
+        y: e.clientY - transientPosition.y,
       });
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isDragging && onPositionChange) {
-      onPositionChange({
+    if (isDragging) {
+      setTransientPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y,
       });
@@ -112,21 +127,23 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   };
 
   const handleMouseUp = () => {
+    if (isDragging) {
+      // Commit the final position to the history
+      onTransformChange({ ...transform, position: transientPosition });
+    }
     setIsDragging(false);
   };
   
   const handleRotate = () => {
-    if (onRotationChange && typeof rotation === 'number') {
-        onRotationChange((rotation + 90) % 360);
-    }
+    onTransformChange({ ...transform, rotation: (rotation + 90) % 360 });
+  };
+  
+  const handleZoomChange = (newZoom: number) => {
+    onTransformChange({ ...transform, zoom: newZoom });
   };
 
-  const handleReset = () => {
-    if (onZoomChange) onZoomChange(1);
-    if (onRotationChange) onRotationChange(0);
-    if (onPositionChange) onPositionChange({ x: 0, y: 0 });
-  };
 
+  const displayPosition = isDragging ? transientPosition : position;
 
   return (
     <div className="bg-gray-800/50 rounded-2xl shadow-lg p-4 flex flex-col gap-4">
@@ -157,8 +174,8 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
             alt={title} 
             className="object-contain w-full h-full transition-transform duration-200"
             style={{
-                transform: `translate(${position?.x || 0}px, ${position?.y || 0}px) scale(${zoom || 1}) rotate(${rotation || 0}deg)`,
-                cursor: (zoom && zoom > 1) ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                transform: `translate(${displayPosition.x}px, ${displayPosition.y}px) scale(${zoom}) rotate(${rotation}deg)`,
+                cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
                 maxWidth: '100%',
                 maxHeight: '100%',
             }}
@@ -169,15 +186,21 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
           <div className="text-gray-600 flex flex-col items-center">
             <PhotoIcon className="w-16 h-16" />
             <p className="mt-2">{title} will appear here.</p>
-
           </div>
         ) : null}
       </div>
       
       {/* The controls are now outside the image container, as a direct child of the flex-col layout. */}
-      {imageUrl && !showLoading && onZoomChange && (
+      {imageUrl && !showLoading && (
           <div className="self-center bg-gray-900/70 backdrop-blur-sm rounded-full p-1 flex items-center gap-1 shadow-lg">
-              <button onClick={() => onZoomChange(Math.max(1, (zoom || 1) - 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom out">
+              <button onClick={onUndo} disabled={!canUndo} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors disabled:text-gray-600 disabled:hover:bg-transparent disabled:cursor-not-allowed" aria-label="Undo">
+                  <UndoIcon className="w-5 h-5" />
+              </button>
+              <button onClick={onRedo} disabled={!canRedo} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors disabled:text-gray-600 disabled:hover:bg-transparent disabled:cursor-not-allowed" aria-label="Redo">
+                  <RedoIcon className="w-5 h-5" />
+              </button>
+              <div className="w-px h-5 bg-gray-600 mx-1"></div>
+              <button onClick={() => handleZoomChange(Math.max(1, zoom - 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom out">
                   <ZoomOutIcon className="w-5 h-5" />
               </button>
               <input 
@@ -186,18 +209,18 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
                   max="3" 
                   step="0.05" 
                   value={zoom} 
-                  onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+                  onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
                   className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer range-sm mx-1"
                   aria-label="Zoom level"
               />
-              <button onClick={() => onZoomChange(Math.min(3, (zoom || 1) + 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom in">
+              <button onClick={() => handleZoomChange(Math.min(3, zoom + 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom in">
                   <ZoomInIcon className="w-5 h-5" />
               </button>
               <div className="w-px h-5 bg-gray-600 mx-1"></div>
               <button onClick={handleRotate} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Rotate clockwise">
                   <RotateIcon className="w-5 h-5" />
               </button>
-              <button onClick={handleReset} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Reset transformations">
+              <button onClick={onReset} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Reset transformations">
                   <ResetZoomIcon className="w-5 h-5" />
               </button>
           </div>

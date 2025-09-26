@@ -1,5 +1,5 @@
 {
-  "name": "Copy of AI Fashion Photoshoot Studio",
+  "name": "One-Prompt AI Fashion Studio",
   "description": "An AI-powered photo editing application that generates new editorial-style images. It maintains the model's identity and clothing from a source image while allowing customization of the background and pose through text prompts.",
   "requestFramePermissions": []
 }
