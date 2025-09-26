@@ -139,7 +139,8 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 const ART_STYLES = [
   "Photorealistic", "Cinematic", "Vintage Film", "Anime", 
-  "Fantasy Art", "Watercolor", "Impressionistic", "Art Deco", "Minimalist"
+  "Fantasy Art", "Watercolor", "Impressionistic", "Art Deco", "Minimalist",
+  "Cyberpunk", "Surrealist", "Gothic"
 ];
 
 const App: React.FC = () => {
