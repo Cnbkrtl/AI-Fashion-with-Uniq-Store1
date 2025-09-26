@@ -92,28 +92,21 @@ export const generateFashionImage = async (
 ): Promise<string> => {
   const model = 'gemini-2.5-flash-image-preview';
 
-  const imagePart = {
-    inlineData: await fileToInlineData(imageFile)
-  };
-
   const parts: (
     | { inlineData: { mimeType: string; data: string } }
     | { text: string }
-  )[] = [imagePart];
+  )[] = [];
 
   let combinedPrompt: string;
   const stylePrompt = style && style.toLowerCase() !== 'photorealistic' 
     ? `in a ${style.toLowerCase()} style` 
     : 'in a photorealistic style';
   
+  // Construct the prompt first
   if (backgroundRefFile) {
-    const backgroundRefPart = {
-      inlineData: await fileToInlineData(backgroundRefFile),
-    };
-    parts.push(backgroundRefPart);
-    // The prompt needs to be very specific about which image is which.
-    // The model will see parts in order: [model_image, background_image, text_prompt]
-    combinedPrompt = `Using the first image for the person and their clothing, and using the second image as a strong visual reference for the background environment and style, generate a new fashion editorial image ${stylePrompt}. The scene is described as: "${scenePrompt}". Recreate the person's appearance and clothing from the first image. The person's pose and the overall composition should be newly generated to fit the described scene and the style of the reference background.`;
+    // When using multiple images, the prompt should refer to them positionally.
+    // The parts will be added in order: [text, model_image, background_image]
+    combinedPrompt = `Using the first image provided (the person) and the second image provided (the background reference), generate a new fashion editorial image ${stylePrompt}. The scene is described as: "${scenePrompt}". The first image is the primary subject; you must recreate the person's appearance and clothing. The second image should be used as a strong visual reference for the new background's style, mood, and color palette. The person's pose and the overall composition should be newly generated to fit the scene.`;
   } else {
     combinedPrompt = `Generate a new fashion editorial image ${stylePrompt} based on the scene description: "${scenePrompt}". Use the provided image of a person as a strong visual reference for their appearance and clothing. Recreate the style of the outfit, the person's hair, and general physical characteristics in the new scene. The person's pose and the background environment should be newly generated based on the scene description.`;
   }
@@ -126,7 +119,20 @@ export const generateFashionImage = async (
   
   combinedPrompt += ` The result should be a cohesive, high-quality photograph.`;
   
+  // Add parts in the order: text, model image, then optional background image.
   parts.push({ text: combinedPrompt });
+  
+  const imagePart = {
+    inlineData: await fileToInlineData(imageFile)
+  };
+  parts.push(imagePart);
+  
+  if (backgroundRefFile) {
+    const backgroundRefPart = {
+      inlineData: await fileToInlineData(backgroundRefFile),
+    };
+    parts.push(backgroundRefPart);
+  }
   
   try {
     const response = await ai.models.generateContent({
