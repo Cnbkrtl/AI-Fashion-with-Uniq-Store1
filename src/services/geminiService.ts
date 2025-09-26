@@ -186,9 +186,9 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     }
   };
 
-  // Revised prompt to focus on quality improvement without triggering identity policies.
+  // A more specific and emphatic prompt for higher quality enhancement.
   const textPart = {
-    text: "Enhance this image by upscaling it to a higher resolution and improving its photorealism. Focus on refining details like textures, skin tones, lighting, and shadows to achieve a professional, high-quality photographic look. It is critical to preserve all original elements of the image—do not change the person's appearance, clothing, pose, or the background. The objective is strictly to improve visual quality and fidelity without altering the content.",
+    text: "Upscale and enhance this photograph to a professional, photorealistic quality. Significantly improve the resolution and clarity. Focus on refining the fine details: sharpen textures in fabric, clarify skin tones, and enhance the interplay of light and shadow to create a more dynamic and realistic image. It is absolutely critical to preserve the original content: do not change the person's appearance, clothing, pose, or the background. The goal is only to increase the technical quality and realism of the existing image.",
   };
 
   try {
