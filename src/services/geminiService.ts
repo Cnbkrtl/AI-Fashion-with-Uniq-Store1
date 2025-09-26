@@ -75,7 +75,7 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        const base64ImageBytes: string = part.inlineData.data;
+        const base64ImageBytes: string = part.inlineData.data ?? '';
         // Background removal should always return PNG for transparency
         return `data:image/png;base64,${base64ImageBytes}`;
       }
@@ -155,7 +155,7 @@ export const generateFashionImage = async ({
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        const base64ImageBytes: string = part.inlineData.data;
+        const base64ImageBytes: string = part.inlineData.data ?? '';
         const mimeType = part.inlineData.mimeType;
         return `data:${mimeType};base64,${base64ImageBytes}`;
       }
@@ -216,7 +216,7 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        const base64ImageBytes: string = part.inlineData.data;
+        const base64ImageBytes: string = part.inlineData.data ?? '';
         const responseMimeType = part.inlineData.mimeType;
         return `data:${responseMimeType};base64,${base64ImageBytes}`;
       }
