@@ -313,48 +313,63 @@ const App: React.FC = () => {
     containerSize: { width: number; height: number }
   ): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // Robust check for valid container size at the beginning
+      if (!containerSize || containerSize.width <= 0 || containerSize.height <= 0) {
+        return reject(new Error('Invalid container dimensions for transformation. Please ensure the image display is visible.'));
+      }
+  
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          return reject(new Error('Could not get canvas context for transformation.'));
+        try { // Wrap the entire canvas logic in a try/catch block for safety
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return reject(new Error('Could not get canvas context for transformation.'));
+          }
+          
+          const { naturalWidth: w, naturalHeight: h } = img;
+          const { zoom, rotation, position } = transformState;
+  
+          const containerAspect = containerSize.width / containerSize.height;
+          const imageAspect = w / h;
+          
+          let renderedWidth;
+          if (imageAspect > containerAspect) {
+              renderedWidth = containerSize.width;
+          } else {
+              const renderedHeight = containerSize.height;
+              renderedWidth = renderedHeight * imageAspect;
+          }
+  
+          // Add a guard against division by zero or invalid calculations
+          if (renderedWidth <= 0 || !isFinite(renderedWidth)) {
+              return reject(new Error(`Calculated an invalid rendered width: ${renderedWidth}. Cannot apply transformations.`));
+          }
+  
+          const scaleFactor = w / renderedWidth;
+  
+          canvas.width = w;
+          canvas.height = h;
+  
+          ctx.translate(w / 2, h / 2);
+          ctx.translate(position.x * scaleFactor, position.y * scaleFactor);
+          ctx.rotate((rotation * Math.PI) / 180);
+          ctx.scale(zoom, zoom);
+          ctx.drawImage(img, -w / 2, -h / 2, w, h);
+          
+          const dataUrl = canvas.toDataURL('image/png');
+  
+          // Final check to ensure the canvas didn't produce an empty image
+          if (!dataUrl || dataUrl === 'data:,') {
+              return reject(new Error('Image transformation resulted in an empty image.'));
+          }
+          
+          resolve(dataUrl);
+        } catch (e) {
+            reject(e instanceof Error ? e : new Error('An unknown error occurred during image transformation.'));
         }
-        
-        const { naturalWidth: w, naturalHeight: h } = img;
-        const { zoom, rotation, position } = transformState;
-
-        // Calculate the scale factor between the displayed image and the natural image
-        const containerAspect = containerSize.width / containerSize.height;
-        const imageAspect = w / h;
-        
-        let renderedWidth;
-        if (imageAspect > containerAspect) {
-            // Image is wider than container, so width is the constraint
-            renderedWidth = containerSize.width;
-        } else {
-            // Image is taller than or equal to container aspect, so height is the constraint
-            const renderedHeight = containerSize.height;
-            renderedWidth = renderedHeight * imageAspect;
-        }
-
-        const scaleFactor = w / renderedWidth;
-
-        // Apply transformations in image coordinate space
-        canvas.width = w;
-        canvas.height = h;
-
-        ctx.translate(w / 2, h / 2);
-        // Translate position from screen space to image space
-        ctx.translate(position.x * scaleFactor, position.y * scaleFactor);
-        ctx.rotate((rotation * Math.PI) / 180);
-        ctx.scale(zoom, zoom);
-        ctx.drawImage(img, -w / 2, -h / 2, w, h);
-        
-        // Use PNG to preserve transparency if background was removed
-        resolve(canvas.toDataURL('image/png'));
       };
-      img.onerror = () => reject(new Error('Failed to load image for applying transformations.'));
+      img.onerror = () => reject(new Error('Failed to load the generated image for applying transformations. It might be corrupt.'));
       img.src = baseImageUrl;
     });
   }, []);
@@ -365,12 +380,20 @@ const App: React.FC = () => {
       return;
     }
     
-    const container = document.querySelector('#ai-generated-image-display .generated-image-container');
+    const container = document.querySelector<HTMLDivElement>('#ai-generated-image-display .generated-image-container');
     if (!container) {
         setError("Could not find the image display area to process edits. Please try again.");
         return;
     }
-    const containerSize = { width: container.clientWidth, height: container.clientHeight };
+    
+    const rect = container.getBoundingClientRect();
+    const containerSize = { width: rect.width, height: rect.height };
+    
+    // Explicitly check for zero dimensions which can cause calculation errors
+    if (containerSize.width === 0 || containerSize.height === 0) {
+      setError("Image display area has zero dimensions, cannot process edits. Please wait for the UI to fully load and try again.");
+      return;
+    }
   
     setIsEnhancing(true);
     setError(null);
