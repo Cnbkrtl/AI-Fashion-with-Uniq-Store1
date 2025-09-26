@@ -236,22 +236,9 @@ const App: React.FC = () => {
           throw new Error("Could not find image container for processing.");
         }
         
-        const containerWidth = container.clientWidth;
-        const containerHeight = container.clientHeight;
-        const containerAspect = containerWidth / containerHeight;
-        const imageAspect = img.naturalWidth / img.naturalHeight;
-        
-        // Calculate the visual size of the image within the container
-        let renderedWidth;
-        if (imageAspect > containerAspect) {
-          renderedWidth = containerWidth;
-        } else {
-          renderedWidth = containerHeight * imageAspect;
-        }
-
-        // Determine the scale factor to convert screen edits to full-resolution image edits
-        const scaleFactor = img.naturalWidth / renderedWidth;
-
+        // --- START: FIX for Black Bars ---
+        // Create a canvas with the image's true, natural dimensions.
+        // This is the key to preventing letterboxing (black bars).
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
@@ -261,16 +248,33 @@ const App: React.FC = () => {
           throw new Error("Could not get canvas context.");
         }
 
-        // Center the transformation origin
+        // Calculate the visual size of the image as it appears on screen (respecting "object-contain")
+        const containerAspect = container.clientWidth / container.clientHeight;
+        const imageAspect = img.naturalWidth / img.naturalHeight;
+        let renderedWidth;
+        if (imageAspect > containerAspect) {
+          renderedWidth = container.clientWidth;
+        } else {
+          renderedWidth = container.clientHeight * imageAspect;
+        }
+
+        // Determine the scale factor to convert screen-space edits (like panning) to full-resolution image-space.
+        const scaleFactor = img.naturalWidth / renderedWidth;
+
+        // Apply transformations to the canvas context
+        // 1. Move the origin to the center of the canvas
         ctx.translate(canvas.width / 2, canvas.height / 2);
-        
-        // Apply user transformations, scaled to the full-res image
+        // 2. Apply the user's pan, scaled to full resolution
         ctx.translate(position.x * scaleFactor, position.y * scaleFactor);
+        // 3. Apply rotation
         ctx.rotate((rotation * Math.PI) / 180);
+        // 4. Apply zoom
         ctx.scale(zoom, zoom);
         
         // Draw the image centered on the transformed origin
+        // The image itself fills the entire canvas, leaving no empty space.
         ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+        // --- END: FIX for Black Bars ---
         
         const editedImageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
   
