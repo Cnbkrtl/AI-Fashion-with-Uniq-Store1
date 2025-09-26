@@ -25,22 +25,25 @@ interface ImageDisplayProps {
   onReset?: () => void;
 }
 
-const GENERATION_MESSAGES = [
-  "Warming up the AI artist...",
-  "Analyzing your model and scene...",
-  "Sketching the new composition...",
-  "Applying digital paints and textures...",
-  "Rendering final details...",
-  "Adding the finishing touches...",
+const FASHION_GENERATION_MESSAGES = [
+  "Sketching the digital fabric...",
+  "Consulting with the style-bots...",
+  "Scouting virtual photoshoot locations...",
+  "Teaching the AI to smize...",
+  "Adjusting the cyber-lighting rig...",
+  "Painting pixels with panache...",
+  "Dreaming up a new reality...",
+  "Tailoring the final look...",
 ];
 
-const ENHANCEMENT_MESSAGES = [
-  "Preparing image for enhancement...",
-  "Analyzing pixel data and lighting...",
-  "Applying advanced upscaling algorithms...",
-  "Refining textures and sharpening details...",
-  "Adjusting photorealistic lighting...",
-  "Finalizing the high-resolution image...",
+const FASHION_ENHANCEMENT_MESSAGES = [
+  "Adding a touch of digital glamour...",
+  "Sharpening the look, pixel by pixel...",
+  "Giving it the high-fashion treatment...",
+  "Making it magazine-ready...",
+  "Polishing the masterpiece...",
+  "Boosting photorealistic details...",
+  "Finalizing the couture render...",
 ];
 
 
@@ -85,7 +88,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
     const currentShowLoading = isLoading || isEnhancing;
 
     if (currentShowLoading) {
-      const messages = isEnhancing ? ENHANCEMENT_MESSAGES : GENERATION_MESSAGES;
+      const messages = isEnhancing ? FASHION_ENHANCEMENT_MESSAGES : FASHION_GENERATION_MESSAGES;
       let messageIndex = 0;
       
       setLoadingMessage(messages[messageIndex]);
@@ -93,7 +96,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
       messageIntervalRef.current = window.setInterval(() => {
         messageIndex = (messageIndex + 1) % messages.length;
         setLoadingMessage(messages[messageIndex]);
-      }, 3500);
+      }, 2800); // Shortened interval for a more dynamic feel
 
     } else {
       setLoadingMessage('');
@@ -160,12 +163,12 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
         onMouseLeave={handleMouseUp}
       >
         {showLoading && (
-          <div className="absolute inset-0 bg-gray-900/80 flex flex-col items-center justify-center text-gray-400 z-10 p-4 text-center">
+          <div className="absolute inset-0 bg-gray-900/80 flex flex-col items-center justify-center text-gray-400 z-10 p-4 text-center animate-pulse-bg">
             <Spinner className="w-10 h-10" />
             <p className="mt-4 text-lg">{isEnhancing ? 'Enhancing your image...' : 'Generating your image...'}</p>
-            <div className="h-5 mt-2">
+            <div className="h-5 mt-2 overflow-hidden">
               {loadingMessage && (
-                <p className="text-sm text-gray-400">
+                <p key={loadingMessage} className="text-sm text-gray-400 animate-fade-in-out">
                   {loadingMessage}
                 </p>
               )}
