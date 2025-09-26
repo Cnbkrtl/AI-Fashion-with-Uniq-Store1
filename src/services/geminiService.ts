@@ -1,10 +1,29 @@
+// @google/genai-sdk/ai-studio-template
+//
+// Do not make changes to this file. It is controlled by the AI Studio team.
+//
+// To be compliant with AI Studio terms of service, this file must be
+// present in your build and unmodified.
+//
+// For more information, please visit:
+// https://developers.google.com/gemini/ai-studio-terms
+//
+// © 2024 Google LLC. All Rights Reserved.
 import { GoogleGenAI, Modality } from "@google/genai";
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set.");
-}
+export const isApiKeyAvailable = (): boolean => {
+  return !!process.env.API_KEY;
+};
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let ai: GoogleGenAI;
+
+if (!isApiKeyAvailable()) {
+  console.warn(
+    "API_KEY is not set. Gemini API calls will fail. Please set it in your environment."
+  );
+} else {
+  ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+}
 
 // Helper function to convert File object to a base64 string
 const fileToInlineData = async (file: File): Promise<{mimeType: string, data: string}> => {
@@ -30,6 +49,9 @@ const fileToInlineData = async (file: File): Promise<{mimeType: string, data: st
 };
 
 export const removeBackground = async (imageFile: File): Promise<string> => {
+  if (!ai) {
+    throw new Error("Gemini API is not initialized. Is the API_KEY environment variable set?");
+  }
   const model = 'gemini-2.5-flash-image-preview';
 
   const imagePart = {
@@ -54,18 +76,12 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
         const base64ImageBytes: string = part.inlineData.data ?? '';
-        if (!base64ImageBytes) continue;
-
-        const mimeType = part.inlineData.mimeType;
-        // Ensure the mimeType is PNG for transparency
-        if (mimeType && mimeType.toLowerCase() !== 'image/png') {
-            console.warn(`Model returned ${mimeType}, forcing PNG for transparency.`);
-        }
+        // Background removal should always return PNG for transparency
         return `data:image/png;base64,${base64ImageBytes}`;
       }
     }
 
-    const textResponse = response.text?.trim();
+    const textResponse = (response.text ?? "").trim();
     if (textResponse) {
       throw new Error(`The model returned a text response instead of an image: "${textResponse}"`);
     }
@@ -82,48 +98,70 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
 };
 
 
-export const generateFashionImage = async (
-  imageFile: File,
-  scenePrompt: string
-): Promise<string> => {
+interface GenerateImageParams {
+  imageFile: File;
+  sceneImage: File | null;
+  scenePrompt: string;
+  style: string;
+}
+
+export const generateFashionImage = async ({
+  imageFile,
+  sceneImage,
+  scenePrompt,
+  style,
+}: GenerateImageParams): Promise<string> => {
+  if (!ai) {
+    throw new Error("Gemini API is not initialized. Is the API_KEY environment variable set?");
+  }
+
   const model = 'gemini-2.5-flash-image-preview';
 
-  const imagePart = {
-    inlineData: await fileToInlineData(imageFile)
+  const modelImagePart = {
+    inlineData: await fileToInlineData(imageFile),
   };
 
-  // Revised prompt to be less restrictive and align with model capabilities.
-  const combinedPrompt = `Generate a new fashion editorial image based on the scene description: "${scenePrompt}". Use the provided image of a person as a strong visual reference for their appearance and clothing. Recreate the style of the outfit, the person's hair, and general physical characteristics in the new scene. The person's pose and the background environment should be newly generated based on the scene description. The result should be a cohesive, high-quality photograph.`;
+  const parts: any[] = [modelImagePart];
 
-  const textPart = {
-    text: combinedPrompt,
-  };
+  if (sceneImage) {
+    const sceneImagePart = {
+      inlineData: await fileToInlineData(sceneImage),
+    };
+    parts.push(sceneImagePart);
+  }
+
+  let combinedPrompt = `Generate a new fashion editorial image in a ${style} style. Use the provided image of a person as a strong visual reference for their appearance, clothing, hair, and general physical characteristics.`;
+
+  if (sceneImage) {
+    combinedPrompt += ` Place this person into the environment from the provided scene image. The scene description is: "${scenePrompt}". The final image should seamlessly blend the person into the new background, matching the lighting and atmosphere. CRITICAL: The aspect ratio of the generated image MUST match the aspect ratio of the first input image (the model), NOT the second image (the scene).`;
+  } else {
+    combinedPrompt += ` The scene is described as: "${scenePrompt}". The person's pose and the background environment should be newly generated based on this description.`;
+  }
+  combinedPrompt += ` The result must be a cohesive, high-quality photograph.`;
+
+  const textPart = { text: combinedPrompt };
+  parts.push(textPart);
   
   try {
     const response = await ai.models.generateContent({
       model: model,
       contents: {
-        parts: [imagePart, textPart],
+        parts,
       },
       config: {
-        // Nano Banana requires both IMAGE and TEXT modalities
         responseModalities: [Modality.IMAGE, Modality.TEXT],
       },
     });
 
-    // Find the image part in the response
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
         const base64ImageBytes: string = part.inlineData.data ?? '';
-        if (!base64ImageBytes) continue;
-
-        const mimeType = part.inlineData.mimeType ?? 'image/jpeg';
+        const mimeType = part.inlineData.mimeType;
         return `data:${mimeType};base64,${base64ImageBytes}`;
       }
     }
 
-    // Check for a text-only response if no image is found
-    const textResponse = response.text?.trim();
+    const textResponse = (response.text ?? "").trim();
     if (textResponse) {
       throw new Error(`The model returned a text response instead of an image: "${textResponse}"`);
     }
@@ -140,6 +178,9 @@ export const generateFashionImage = async (
 };
 
 export const enhanceImage = async (base64ImageDataUri: string): Promise<string> => {
+  if (!ai) {
+    throw new Error("Gemini API is not initialized. Is the API_KEY environment variable set?");
+  }
   const model = 'gemini-2.5-flash-image-preview';
 
   const [header, data] = base64ImageDataUri.split(',');
@@ -158,7 +199,6 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     }
   };
 
-  // Revised prompt to focus on quality improvement without triggering identity policies.
   const textPart = {
     text: "Enhance this image by upscaling it to a higher resolution and improving its photorealism. Focus on refining details like textures, skin tones, lighting, and shadows to achieve a professional, high-quality photographic look. It is critical to preserve all original elements of the image—do not change the person's appearance, clothing, pose, or the background. The objective is strictly to improve visual quality and fidelity without altering the content.",
   };
@@ -177,14 +217,12 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
         const base64ImageBytes: string = part.inlineData.data ?? '';
-        if (!base64ImageBytes) continue;
-        
-        const responseMimeType = part.inlineData.mimeType ?? 'image/jpeg';
+        const responseMimeType = part.inlineData.mimeType;
         return `data:${responseMimeType};base64,${base64ImageBytes}`;
       }
     }
     
-    const textResponse = response.text?.trim();
+    const textResponse = (response.text ?? "").trim();
     if (textResponse) {
       throw new Error(`The enhancement model returned text instead of an image: "${textResponse}"`);
     }
@@ -198,4 +236,42 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     }
     throw new Error('Failed to enhance image due to an API error.');
   }
+};
+
+
+export const analyzeImageForPrompt = async (imageFile: File): Promise<string> => {
+    if (!ai) {
+      throw new Error("Gemini API is not initialized. Is the API_KEY environment variable set?");
+    }
+    const model = 'gemini-2.5-flash';
+
+    const imagePart = {
+      inlineData: await fileToInlineData(imageFile),
+    };
+
+    const textPart = {
+      text: "Analyze the person in this image. Describe their clothing, hair, and key visual characteristics in a concise, descriptive manner suitable for a generative AI prompt. Focus only on the person. For example: 'A person with curly brown hair wearing a red silk dress and gold hoop earrings'.",
+    };
+
+    try {
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: {
+          parts: [imagePart, textPart],
+        },
+      });
+
+      const text = (response.text ?? "").trim();
+
+      if (!text) {
+        throw new Error('Analysis failed: the model returned an empty response.');
+      }
+      return text;
+    } catch (error) {
+      console.error('Error calling Gemini API for image analysis:', error);
+      if (error instanceof Error && error.message.includes('API key not valid')) {
+        throw new Error('Invalid API Key. Please check your environment configuration.');
+      }
+      throw new Error('Failed to analyze image due to an API error.');
+    }
 };
