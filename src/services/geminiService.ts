@@ -1,6 +1,6 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// FIX: Use `process.env.API_KEY` to initialize the GoogleGenAI client as per the guidelines. This resolves the TypeScript error related to `import.meta.env`.
+// Fix: Per coding guidelines, API key must be from process.env.API_KEY.
 if (!process.env.API_KEY) {
     throw new Error("API_KEY environment variable is not set.");
 }
@@ -53,8 +53,7 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      // FIX: The presence of `part.inlineData` is a sufficient check.
-      if (part.inlineData) {
+      if (part.inlineData && part.inlineData.data && part.inlineData.mimeType) {
         const base64ImageBytes: string = part.inlineData.data;
         const mimeType = part.inlineData.mimeType;
         // Ensure the mimeType is PNG for transparency
@@ -113,8 +112,7 @@ export const generateFashionImage = async (
 
     // Find the image part in the response
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      // FIX: The presence of `part.inlineData` is a sufficient check.
-      if (part.inlineData) {
+      if (part.inlineData && part.inlineData.data && part.inlineData.mimeType) {
         const base64ImageBytes: string = part.inlineData.data;
         const mimeType = part.inlineData.mimeType;
         return `data:${mimeType};base64,${base64ImageBytes}`;
@@ -145,10 +143,11 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
   if (!header || !data) {
     throw new Error("Invalid base64 image data URI for enhancement.");
   }
-  const mimeType = header.match(/:(.*?);/)?.[1];
-  if (!mimeType) {
+  const mimeTypeMatch = header.match(/:(.*?);/);
+  if (!mimeTypeMatch || !mimeTypeMatch[1]) {
     throw new Error("Could not extract mime type from data URI for enhancement.");
   }
+  const mimeType = mimeTypeMatch[1];
   
   const imagePart = {
     inlineData: {
@@ -174,8 +173,7 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      // FIX: The presence of `part.inlineData` is a sufficient check.
-      if (part.inlineData) {
+      if (part.inlineData && part.inlineData.data && part.inlineData.mimeType) {
         const base64ImageBytes: string = part.inlineData.data;
         const responseMimeType = part.inlineData.mimeType;
         return `data:${responseMimeType};base64,${base64ImageBytes}`;
