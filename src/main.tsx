@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { ApiErrorDisplay } from './components/ApiErrorDisplay';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -9,8 +10,12 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+
+// Critical check for API key presence to provide a better developer experience.
+const apiKey = process.env.API_KEY;
+
 root.render(
   <React.StrictMode>
-    <App />
+    {apiKey ? <App /> : <ApiErrorDisplay />}
   </React.StrictMode>
 );

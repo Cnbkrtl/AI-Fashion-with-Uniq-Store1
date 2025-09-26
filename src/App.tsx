@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ImageUploader } from './components/ImageUploader';
 import { TextInput } from './components/TextInput';
 import { Spinner } from './components/Spinner';
@@ -11,6 +11,7 @@ import { MagicWandIcon } from './components/icons/MagicWandIcon';
 import { PortraitIcon } from './components/icons/PortraitIcon';
 import { LandscapeIcon } from './components/icons/LandscapeIcon';
 import { useHistory } from './hooks/useHistory';
+import { LightbulbIcon } from './components/icons/LightbulbIcon';
 
 // Centralized type definitions for settings
 export interface ColorGradingSettings {
@@ -48,6 +49,20 @@ export interface AppSettings {
 }
 
 const SETTINGS_STORAGE_KEY = 'aiFashionStudioAppSettings';
+
+const PROMPT_IDEAS = [
+    "A model wearing a flowing red dress, standing on a black sand beach at dusk, moody lighting.",
+    "Close-up portrait of a person with intricate face paint, wearing futuristic neon-lit clothing in a cyberpunk city alley.",
+    "A person in a vintage 1920s suit, leaning against a classic car on a misty cobblestone street at night.",
+    "A model in a high-fashion, avant-garde outfit made of recycled materials, posing in a minimalist concrete skatepark.",
+    "A full-body shot of a dancer in mid-air, wearing a vibrant, multi-layered tulle dress in a grand, sunlit ballroom.",
+    "A person wearing rugged hiking gear, looking out over a dramatic mountain vista at sunrise, lens flare.",
+    "A whimsical scene of a model in a pastel-colored gown, having a tea party with a robot in an overgrown garden.",
+    "A powerful shot of a model in a sharp, tailored business suit, walking through a bustling financial district, motion blur.",
+    "A surreal image of a person whose clothing appears to be made of water, standing in a shallow, reflective pool inside a cave.",
+    "A model wearing a bohemian-style outfit, playing a guitar in a field of wildflowers during the golden hour.",
+];
+
 
 export const getDefaultSettings = (): AppSettings => ({
   defaultScenePrompt: 'A woman standing confidently on a balcony overlooking the sea at sunset.',
@@ -154,6 +169,7 @@ const App: React.FC = () => {
   const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+  const [promptIdeaIndex, setPromptIdeaIndex] = useState(0);
 
   // FIX: Refactor image editing state to use the useHistory hook for undo/redo functionality.
   const {
@@ -166,6 +182,19 @@ const App: React.FC = () => {
     canRedo: canRedoTransform,
   } = useHistory<TransformationState>(initialTransformState);
   
+  // Memory management for object URLs
+  useEffect(() => {
+    // This is a cleanup function that will be called when the component unmounts.
+    return () => {
+      if (sourceImageUrl) {
+        URL.revokeObjectURL(sourceImageUrl);
+      }
+      if (backgroundRefImageUrl) {
+        URL.revokeObjectURL(backgroundRefImageUrl);
+      }
+    };
+  }, [sourceImageUrl, backgroundRefImageUrl]);
+
   const setExportSettings = (updater: React.SetStateAction<ExportSettings>) => {
     setAppSettings(prev => {
         const newExportSettings = typeof updater === 'function' ? updater(prev.exportSettings) : updater;
@@ -205,6 +234,11 @@ const App: React.FC = () => {
     }
     setBackgroundRefImage(null);
     setBackgroundRefImageUrl(null);
+  };
+
+  const handleGetPromptIdea = () => {
+    setScenePrompt(PROMPT_IDEAS[promptIdeaIndex]);
+    setPromptIdeaIndex((prevIndex) => (prevIndex + 1) % PROMPT_IDEAS.length);
   };
 
   const handleRemoveBackground = useCallback(async () => {
@@ -489,13 +523,24 @@ const App: React.FC = () => {
             </button>
             
             <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">2. Design the Photoshoot</h2>
-            <TextInput
-              label="Describe the scene and pose"
-              value={scenePrompt}
-              onChange={(e) => setScenePrompt(e.target.value)}
-              placeholder="e.g., A woman standing confidently on a balcony overlooking the sea at sunset."
-              rows={4}
-            />
+            <div className="relative">
+              <TextInput
+                label="Describe the scene and pose"
+                value={scenePrompt}
+                onChange={(e) => setScenePrompt(e.target.value)}
+                placeholder="e.g., A woman standing confidently on a balcony overlooking the sea at sunset."
+                rows={4}
+              />
+              <button
+                onClick={handleGetPromptIdea}
+                className="absolute top-0 right-0 p-2 text-gray-400 hover:text-cyan-400 transition-colors"
+                aria-label="Get a prompt idea"
+                title="Get a prompt idea"
+              >
+                <LightbulbIcon className="w-5 h-5" />
+              </button>
+            </div>
+
 
             <div>
               <label htmlFor="style-selector" className="block text-sm font-medium text-gray-300 mb-2">Artistic Style</label>
