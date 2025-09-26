@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, Part } from "@google/genai";
 
 // Initialize the client. If the API key is missing, pass an empty string.
 // The actual API calls will fail, which is handled below, but the app won't crash on import.
@@ -114,32 +114,56 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
   }
 };
 
+interface GenerateImageParams {
+  imageFile: File;
+  sceneImage: File | null;
+  scenePrompt: string;
+  style: string;
+}
 
-export const generateFashionImage = async (
-  imageFile: File,
-  scenePrompt: string
-): Promise<string> => {
+export const generateFashionImage = async ({
+  imageFile,
+  sceneImage,
+  scenePrompt,
+  style,
+}: GenerateImageParams): Promise<string> => {
   const model = 'gemini-2.5-flash-image-preview';
+  const parts: Part[] = [];
 
-  const imagePart = {
-    inlineData: await fileToInlineData(imageFile)
-  };
+  // 1. Add the main subject/model image
+  parts.push({ inlineData: await fileToInlineData(imageFile) });
 
-  // Revised prompt to be less restrictive and align with model capabilities.
-  const combinedPrompt = `Generate a new fashion editorial image based on the scene description: "${scenePrompt}". Use the provided image of a person as a strong visual reference for their appearance and clothing. Recreate the style of the outfit, the person's hair, and general physical characteristics in the new scene. The person's pose and the background environment should be newly generated based on the scene description. The result should be a cohesive, high-quality photograph.`;
+  // 2. Add the optional scene/background image
+  if (sceneImage) {
+    parts.push({ inlineData: await fileToInlineData(sceneImage) });
+  }
 
-  const textPart = {
-    text: combinedPrompt,
-  };
+  // 3. Construct the detailed text prompt
+  let combinedPrompt = `Generate a new fashion editorial image. The final image should have a professional, high-quality photographic look in a '${style}' artistic style.`;
+  
+  if (sceneImage) {
+    combinedPrompt += `\n\n**Visual References:**\n- **Person Reference (first image):** Use this person as the main subject. Recreate their appearance, clothing, hair, and general physical characteristics in the new scene. The pose should be adapted naturally to the new environment.\n- **Scene Reference (second image):** Use this image as the definitive background and environment for the final photo. The subject must be realistically integrated into this scene.`;
+  } else {
+    combinedPrompt += `\n\n**Visual Reference:**\n- **Person Reference (the provided image):** Use this person as the main subject. Recreate their appearance, clothing, hair, and general physical characteristics in the new scene.`;
+  }
+  
+  combinedPrompt += `\n\n**Scene Description:**\n- Create a scene based on this description: "${scenePrompt}".`;
+  
+  if (sceneImage) {
+     combinedPrompt += ` The text description should be used to inform the mood, lighting, and subject's pose within the provided scene image.`;
+  } else {
+    combinedPrompt += ` The background, environment, and the person's pose should be newly generated based on this description.`;
+  }
+
+  combinedPrompt += `\n\n**Final Output Requirements:**\n- The result must be a single, cohesive photograph that seamlessly blends the subject into the environment.\n- Pay close attention to realistic lighting, shadows, and perspective.`;
+
+  parts.unshift({ text: combinedPrompt }); // Add text prompt to the beginning of the array
   
   try {
     const response = await ai.models.generateContent({
       model: model,
-      contents: {
-        parts: [imagePart, textPart],
-      },
+      contents: { parts },
       config: {
-        // Nano Banana requires both IMAGE and TEXT modalities
         responseModalities: [Modality.IMAGE, Modality.TEXT],
       },
     });
@@ -153,7 +177,6 @@ export const generateFashionImage = async (
       }
     }
 
-    // Check for a text-only response if no image is found
     const textResponse = response.text?.trim();
     if (textResponse) {
       throw new Error(`The model returned a text response instead of an image: "${textResponse}"`);
@@ -165,6 +188,7 @@ export const generateFashionImage = async (
     return handleApiError(error, 'generate image');
   }
 };
+
 
 export const enhanceImage = async (base64ImageDataUri: string): Promise<string> => {
   const model = 'gemini-2.5-flash-image-preview';

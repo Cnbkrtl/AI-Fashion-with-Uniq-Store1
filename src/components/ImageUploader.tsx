@@ -1,12 +1,14 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
 import { UploadIcon } from './icons/UploadIcon';
+import { ClearIcon } from './icons/ClearIcon';
 
 interface ImageUploaderProps {
   onImageUpload: (file: File) => void;
   imageUrl: string | null;
+  onClear?: () => void;
 }
 
-export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, imageUrl }) => {
+export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, imageUrl, onClear }) => {
   const [isDragging, setIsDragging] = useState(false);
   const uploaderRef = useRef<HTMLLabelElement>(null);
 
@@ -15,7 +17,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, ima
     if (!imageUrl && uploaderRef.current) {
       uploaderRef.current.focus();
     }
-  }, []); // Empty dependency array ensures this runs only once.
+  }, [imageUrl]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -49,6 +51,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, ima
     }
   }, [onImageUpload]);
 
+  const handleClearClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault(); // Prevent the label from triggering the file input
+    e.stopPropagation();
+    if (onClear) {
+      onClear();
+    }
+  }
+
   const uploaderClass = `relative block w-full aspect-w-3 aspect-h-4 rounded-lg border-2 border-dashed
     ${isDragging ? 'border-cyan-400 bg-gray-700/50' : 'border-gray-600 hover:border-gray-500'}
     transition-colors duration-200 cursor-pointer flex items-center justify-center outline-none focus:ring-2 focus:ring-cyan-500`;
@@ -73,7 +83,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, ima
         onDrop={handleDrop}
       >
         {imageUrl ? (
-          <img src={imageUrl} alt="Uploaded preview" className="object-contain w-full h-full rounded-lg" />
+          <>
+            <img src={imageUrl} alt="Uploaded preview" className="object-contain w-full h-full rounded-lg" />
+            {onClear && (
+              <button 
+                onClick={handleClearClick} 
+                className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white rounded-full p-1.5 transition-all duration-200 z-10"
+                aria-label="Clear image"
+              >
+                <ClearIcon className="w-4 h-4" />
+              </button>
+            )}
+          </>
         ) : (
           <div className="text-center text-gray-400 p-4">
             <UploadIcon className="mx-auto h-12 w-12" />

@@ -137,13 +137,20 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
     return new File([u8arr], filename, {type:mime});
 }
 
+const ART_STYLES = [
+  "Photorealistic", "Cinematic", "Vintage Film", "Anime", 
+  "Fantasy Art", "Watercolor", "Impressionistic", "Art Deco", "Minimalist"
+];
 
 const App: React.FC = () => {
   const [isApiConfigured] = useState<boolean>(isApiKeyAvailable());
   const [appSettings, setAppSettings] = useState<AppSettings>(loadInitialSettings);
   const [sourceImage, setSourceImage] = useState<File | null>(null);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
+  const [sceneImage, setSceneImage] = useState<File | null>(null);
+  const [sceneImageUrl, setSceneImageUrl] = useState<string | null>(null);
   const [scenePrompt, setScenePrompt] = useState<string>(appSettings.defaultScenePrompt);
+  const [style, setStyle] = useState<string>(ART_STYLES[0]);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
@@ -176,6 +183,19 @@ const App: React.FC = () => {
     setSourceImage(file);
     setSourceImageUrl(URL.createObjectURL(file));
     setGeneratedImage(null); // Clear previous generation on new upload
+  };
+
+  const handleSceneImageUpload = (file: File) => {
+    setSceneImage(file);
+    setSceneImageUrl(URL.createObjectURL(file));
+  };
+  
+  const handleClearSceneImage = () => {
+    setSceneImage(null);
+    if (sceneImageUrl) {
+      URL.revokeObjectURL(sceneImageUrl);
+    }
+    setSceneImageUrl(null);
   };
 
   const handleRemoveBackground = useCallback(async () => {
@@ -231,7 +251,12 @@ const App: React.FC = () => {
     setGeneratedImage(null);
 
     try {
-      const imageUrl = await generateFashionImage(sourceImage, scenePrompt);
+      const imageUrl = await generateFashionImage({
+        imageFile: sourceImage,
+        sceneImage,
+        scenePrompt,
+        style,
+      });
       setGeneratedImage(imageUrl);
       // Reset editing transformations for the new image
       resetTransform(initialTransformationState);
@@ -241,7 +266,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [sourceImage, scenePrompt, resetTransform]);
+  }, [sourceImage, sceneImage, scenePrompt, style, resetTransform]);
 
   const downloadImage = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -271,9 +296,6 @@ const App: React.FC = () => {
           throw new Error("Could not find image container for processing.");
         }
         
-        // --- START: FIX for Black Bars ---
-        // Create a canvas with the image's true, natural dimensions.
-        // This is the key to preventing letterboxing (black bars).
         const canvas = document.createElement('canvas');
         canvas.width = img.naturalWidth;
         canvas.height = img.naturalHeight;
@@ -283,7 +305,6 @@ const App: React.FC = () => {
           throw new Error("Could not get canvas context.");
         }
 
-        // Calculate the visual size of the image as it appears on screen (respecting "object-contain")
         const containerAspect = container.clientWidth / container.clientHeight;
         const imageAspect = img.naturalWidth / img.naturalHeight;
         let renderedWidth;
@@ -293,23 +314,14 @@ const App: React.FC = () => {
           renderedWidth = container.clientHeight * imageAspect;
         }
 
-        // Determine the scale factor to convert screen-space edits (like panning) to full-resolution image-space.
         const scaleFactor = img.naturalWidth / renderedWidth;
 
-        // Apply transformations to the canvas context
-        // 1. Move the origin to the center of the canvas
         ctx.translate(canvas.width / 2, canvas.height / 2);
-        // 2. Apply the user's pan, scaled to full resolution
         ctx.translate(transform.position.x * scaleFactor, transform.position.y * scaleFactor);
-        // 3. Apply rotation
         ctx.rotate((transform.rotation * Math.PI) / 180);
-        // 4. Apply zoom
         ctx.scale(transform.zoom, transform.zoom);
         
-        // Draw the image centered on the transformed origin
-        // The image itself fills the entire canvas, leaving no empty space.
         ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-        // --- END: FIX for Black Bars ---
         
         const editedImageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
   
@@ -496,9 +508,9 @@ const App: React.FC = () => {
               <h2 className="text-xl font-bold text-cyan-400">2. Describe the New Scene</h2>
               <button
                 onClick={handleAnalyzeImage}
-                disabled={!sourceImage || anyLoading}
-                className="flex items-center gap-1.5 text-sm bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600/50 disabled:cursor-not-allowed text-cyan-300 font-semibold py-1 px-3 rounded-full transition-all duration-300"
-                title="Analyze uploaded image to improve the prompt"
+                disabled={!sourceImage || anyLoading || !!sceneImage}
+                className="flex items-center gap-1.5 text-sm bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600/50 disabled:cursor-not-allowed disabled:text-gray-500 text-cyan-300 font-semibold py-1 px-3 rounded-full transition-all duration-300"
+                title={!!sceneImage ? "Analysis is disabled when a scene image is used." : "Analyze uploaded image to improve the prompt"}
               >
                 {isAnalyzing ? (
                   <>
@@ -516,13 +528,29 @@ const App: React.FC = () => {
               value={scenePrompt}
               onChange={(e) => setScenePrompt(e.target.value)}
               placeholder="e.g., A woman standing confidently on a balcony overlooking the sea at sunset."
-              rows={6}
+              rows={4}
             />
+             <div>
+              <label htmlFor="style-select" className="block text-sm font-medium text-gray-300 mb-2">Artistic Style</label>
+              <select 
+                id="style-select"
+                value={style}
+                onChange={e => setStyle(e.target.value)}
+                className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all duration-200"
+              >
+                {ART_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
             
+            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">3. (Optional) Upload a Scene</h2>
+            <ImageUploader onImageUpload={handleSceneImageUpload} imageUrl={sceneImageUrl} onClear={handleClearSceneImage} />
+
+
+            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">4. Generate</h2>
             <button
               onClick={handleGenerate}
               disabled={anyLoading || !sourceImage}
-              className="mt-4 w-full flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
+              className="w-full flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
             >
               {isLoading ? (
                 <>
