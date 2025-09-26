@@ -2,13 +2,14 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { ImageUploader } from './components/ImageUploader';
 import { TextInput } from './components/TextInput';
 import { Spinner } from './components/Spinner';
-import { generateFashionImage, enhanceImage, removeBackground, isApiKeyAvailable } from './services/geminiService';
+import { generateFashionImage, enhanceImage, removeBackground, isApiKeyAvailable, analyzeImageForPrompt } from './services/geminiService';
 import { Header } from './components/Header';
 import { ImageDisplay } from './components/ImageDisplay';
 import { ExportModal } from './components/ExportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MagicWandIcon } from './components/icons/MagicWandIcon';
 import { ApiErrorDisplay } from './components/ApiErrorDisplay';
+import { LightbulbIcon } from './components/icons/LightbulbIcon';
 
 // Centralized type definitions for settings
 export interface ColorGradingSettings {
@@ -133,6 +134,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
   const [isRemovingBackground, setIsRemovingBackground] = useState<boolean>(false);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
@@ -180,6 +182,26 @@ const App: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to remove background.');
     } finally {
       setIsRemovingBackground(false);
+    }
+  }, [sourceImage]);
+
+  const handleAnalyzeImage = useCallback(async () => {
+    if (!sourceImage) {
+      setError('Please upload a source image to analyze.');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      const description = await analyzeImageForPrompt(sourceImage);
+      setScenePrompt(prev => `${description}. ${prev}`);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to analyze image.');
+    } finally {
+      setIsAnalyzing(false);
     }
   }, [sourceImage]);
 
@@ -425,7 +447,7 @@ const App: React.FC = () => {
     setShowSettingsModal(false);
   };
 
-  const anyLoading = isLoading || isEnhancing || isRemovingBackground;
+  const anyLoading = isLoading || isEnhancing || isRemovingBackground || isAnalyzing;
 
   if (!isApiConfigured) {
     return <ApiErrorDisplay />;
@@ -457,7 +479,25 @@ const App: React.FC = () => {
               )}
             </button>
             
-            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">2. Describe the New Scene</h2>
+            <div className="border-b border-gray-700 pb-3 mt-4 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-cyan-400">2. Describe the New Scene</h2>
+              <button
+                onClick={handleAnalyzeImage}
+                disabled={!sourceImage || anyLoading}
+                className="flex items-center gap-1.5 text-sm bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600/50 disabled:cursor-not-allowed text-cyan-300 font-semibold py-1 px-3 rounded-full transition-all duration-300"
+                title="Analyze uploaded image to improve the prompt"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Spinner className="w-4 h-4" /> Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <LightbulbIcon className="w-4 h-4" /> Analyze & Suggest
+                  </>
+                )}
+              </button>
+            </div>
             <TextInput
               label="Describe the entire scene..."
               value={scenePrompt}

@@ -186,9 +186,9 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     }
   };
 
-  // A more specific and emphatic prompt for higher quality enhancement.
+  // A more forceful prompt to demand higher technical quality and sharpness.
   const textPart = {
-    text: "Upscale and enhance this photograph to a professional, photorealistic quality. Significantly improve the resolution and clarity. Focus on refining the fine details: sharpen textures in fabric, clarify skin tones, and enhance the interplay of light and shadow to create a more dynamic and realistic image. It is absolutely critical to preserve the original content: do not change the person's appearance, clothing, pose, or the background. The goal is only to increase the technical quality and realism of the existing image.",
+    text: "Dramatically enhance this image to an ultra-realistic, 4K resolution quality. Your task is to upscale the image, sharpen every detail, and improve its overall clarity to match that of a professional DSLR photograph. Focus on making textures in clothing crisp, ensuring skin tones are lifelike, and refining the lighting and shadows for a photorealistic effect. CRITICAL: You must not alter the content in any way. The person's appearance, their pose, the clothing, and the background must remain exactly the same. This is a technical enhancement, not a creative change.",
   };
 
   try {
@@ -219,5 +219,36 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
 
   } catch (error) {
     return handleApiError(error, 'enhance image');
+  }
+};
+
+export const analyzeImageForPrompt = async (imageFile: File): Promise<string> => {
+  const model = 'gemini-2.5-flash';
+
+  const imagePart = {
+    inlineData: await fileToInlineData(imageFile)
+  };
+
+  const textPart = {
+    text: "Analyze the provided image and generate a concise, descriptive sentence for a fashion photoshoot prompt. Describe the person's clothing, hair, and key visual elements. Focus on objective details. For example: 'A woman with long brown hair wearing a beige crop top and matching wide-leg pants.' Do not describe the background.",
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: {
+        parts: [imagePart, textPart],
+      },
+    });
+
+    const textResponse = response.text?.trim();
+    if (textResponse) {
+      return textResponse;
+    }
+
+    throw new Error('Analysis failed. The model did not return a description.');
+
+  } catch (error) {
+    return handleApiError(error, 'analyze image');
   }
 };
