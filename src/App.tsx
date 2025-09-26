@@ -298,13 +298,40 @@ const App: React.FC = () => {
     }
   }, [sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style, resetTransform]);
 
-  const downloadImage = useCallback((dataUrl: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const triggerCanvasDownload = useCallback((
+    canvas: HTMLCanvasElement, 
+    format: 'png' | 'jpeg', 
+    quality: number
+  ): Promise<void> => {
+      return new Promise((resolve, reject) => {
+          const mimeType = `image/${format}`;
+          const filename = `ai-fashion-photoshoot-final.${format}`;
+          const qualityValue = format === 'jpeg' ? quality / 100 : undefined;
+  
+          canvas.toBlob((blob) => {
+              if (!blob) {
+                  return reject(new Error('Failed to create image data for download. The canvas may be empty or too large.'));
+              }
+              
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = filename;
+              
+              document.body.appendChild(link);
+              try {
+                  link.click();
+                  resolve();
+              } catch (err) {
+                  console.error("Download trigger failed:", err);
+                  reject(new Error("The download could not be started. Your browser might be blocking it."));
+              } finally {
+                  document.body.removeChild(link);
+                  // A small timeout before revoking gives the browser time to start the download
+                  setTimeout(() => URL.revokeObjectURL(url), 150); 
+              }
+          }, mimeType, qualityValue);
+      });
   }, []);
 
   const applyTransformationsToImage = useCallback((
@@ -389,7 +416,6 @@ const App: React.FC = () => {
     const rect = container.getBoundingClientRect();
     const containerSize = { width: rect.width, height: rect.height };
     
-    // Explicitly check for zero dimensions which can cause calculation errors
     if (containerSize.width === 0 || containerSize.height === 0) {
       setError("Image display area has zero dimensions, cannot process edits. Please wait for the UI to fully load and try again.");
       return;
@@ -403,17 +429,13 @@ const App: React.FC = () => {
       const latestSettings = { ...appSettings };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(latestSettings));
 
-      // Step 1: Apply user edits (zoom, rotate, pan) before enhancement
       const editedImageDataUrl = await applyTransformationsToImage(generatedImage, transform, containerSize);
-  
-      // Step 2: Enhance the edited image
       const enhancedImageUrl = await enhanceImage(editedImageDataUrl, latestSettings.exportSettings.enhancement);
   
-      // Step 3: Apply final processing and trigger download in a robust promise
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error("Image loading timed out. The enhancement API may have returned an invalid image."));
-        }, 15000); // 15s timeout
+        }, 15000);
 
         const img = new Image();
         img.onload = () => {
@@ -434,19 +456,19 @@ const App: React.FC = () => {
       
             switch (latestSettings.exportSettings.resolution.preset) {
               case 'hd':
-                if (originalAspectRatio >= 1) { // Landscape or square
+                if (originalAspectRatio >= 1) {
                   targetWidth = 1920;
                   targetHeight = 1920 / originalAspectRatio;
-                } else { // Portrait
+                } else {
                   targetHeight = 1920;
                   targetWidth = 1920 * originalAspectRatio;
                 }
                 break;
               case '4k':
-                if (originalAspectRatio >= 1) { // Landscape or square
+                if (originalAspectRatio >= 1) {
                   targetWidth = 3840;
                   targetHeight = 3840 / originalAspectRatio;
-                } else { // Portrait
+                } else {
                   targetHeight = 3840;
                   targetWidth = 3840 * originalAspectRatio;
                 }
@@ -498,25 +520,14 @@ const App: React.FC = () => {
             } else {
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             }
-      
-            let dataUrl: string;
-            let filename: string;
-      
-            if (latestSettings.exportSettings.format === 'png') {
-              dataUrl = canvas.toDataURL('image/png');
-              filename = 'ai-fashion-photoshoot-final.png';
-            } else {
-              const qualityValue = latestSettings.exportSettings.quality / 100;
-              dataUrl = canvas.toDataURL('image/jpeg', qualityValue);
-              filename = 'ai-fashion-photoshoot-final.jpeg';
-            }
             
-            if (!dataUrl || dataUrl === 'data:,') {
-              return reject(new Error("Final processing failed: generated empty image data."));
-            }
+            const format = latestSettings.exportSettings.format;
+            const quality = latestSettings.exportSettings.quality;
 
-            downloadImage(dataUrl, filename);
-            resolve();
+            triggerCanvasDownload(canvas, format, quality)
+              .then(resolve)
+              .catch(reject);
+
           } catch (e) {
             reject(e);
           }
@@ -534,7 +545,7 @@ const App: React.FC = () => {
     } finally {
       setIsEnhancing(false);
     }
-  }, [generatedImage, appSettings, transform, applyTransformationsToImage, downloadImage]);
+  }, [generatedImage, appSettings, transform, applyTransformationsToImage, triggerCanvasDownload]);
 
   const handleSaveSettings = (newSettings: AppSettings) => {
     setAppSettings(newSettings);
