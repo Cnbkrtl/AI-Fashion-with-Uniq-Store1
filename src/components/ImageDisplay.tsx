@@ -172,35 +172,34 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
 
           </div>
         ) : null}
-
-        {imageUrl && !showLoading && onZoomChange && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-gray-900/70 backdrop-blur-sm rounded-full p-1 flex items-center gap-1 z-20 shadow-lg">
-                <button onClick={() => onZoomChange(Math.max(1, (zoom || 1) - 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom out">
-                    <ZoomOutIcon className="w-5 h-5" />
-                </button>
-                <input 
-                    type="range" 
-                    min="1" 
-                    max="3" 
-                    step="0.05" 
-                    value={zoom} 
-                    onChange={(e) => onZoomChange(parseFloat(e.target.value))}
-                    className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer range-sm mx-1"
-                    aria-label="Zoom level"
-                />
-                <button onClick={() => onZoomChange(Math.min(3, (zoom || 1) + 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom in">
-                    <ZoomInIcon className="w-5 h-5" />
-                </button>
-                <div className="w-px h-5 bg-gray-600 mx-1"></div>
-                <button onClick={handleRotate} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Rotate clockwise">
-                    <RotateIcon className="w-5 h-5" />
-                </button>
-                <button onClick={handleReset} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Reset transformations">
-                    <ResetZoomIcon className="w-5 h-5" />
-                </button>
-            </div>
-        )}
       </div>
+      {imageUrl && !showLoading && onZoomChange && (
+          <div className="self-center bg-gray-900/70 backdrop-blur-sm rounded-full p-1 flex items-center gap-1 z-20 shadow-lg">
+              <button onClick={() => onZoomChange(Math.max(1, (zoom || 1) - 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom out">
+                  <ZoomOutIcon className="w-5 h-5" />
+              </button>
+              <input 
+                  type="range" 
+                  min="1" 
+                  max="3" 
+                  step="0.05" 
+                  value={zoom} 
+                  onChange={(e) => onZoomChange(parseFloat(e.target.value))}
+                  className="w-24 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer range-sm mx-1"
+                  aria-label="Zoom level"
+              />
+              <button onClick={() => onZoomChange(Math.min(3, (zoom || 1) + 0.1))} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Zoom in">
+                  <ZoomInIcon className="w-5 h-5" />
+              </button>
+              <div className="w-px h-5 bg-gray-600 mx-1"></div>
+              <button onClick={handleRotate} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Rotate clockwise">
+                  <RotateIcon className="w-5 h-5" />
+              </button>
+              <button onClick={handleReset} className="p-2 text-gray-300 hover:text-white hover:bg-gray-700/50 rounded-full transition-colors" aria-label="Reset transformations">
+                  <ResetZoomIcon className="w-5 h-5" />
+              </button>
+          </div>
+      )}
       {imageUrl && onEnhanceClick && (
         <button
           onClick={onEnhanceClick}

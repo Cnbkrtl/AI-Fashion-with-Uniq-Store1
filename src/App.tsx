@@ -235,37 +235,42 @@ const App: React.FC = () => {
         if (!container) {
           throw new Error("Could not find image container for processing.");
         }
-  
+        
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const containerAspect = containerWidth / containerHeight;
+        const imageAspect = img.naturalWidth / img.naturalHeight;
+        
+        // Calculate the visual size of the image within the container
+        let renderedWidth;
+        if (imageAspect > containerAspect) {
+          renderedWidth = containerWidth;
+        } else {
+          renderedWidth = containerHeight * imageAspect;
+        }
+
+        // Determine the scale factor to convert screen edits to full-resolution image edits
+        const scaleFactor = img.naturalWidth / renderedWidth;
+
         const canvas = document.createElement('canvas');
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
         const ctx = canvas.getContext('2d');
-  
+
         if (!ctx) {
           throw new Error("Could not get canvas context.");
         }
-  
-        // Calculate the initial rendered size of the image to fit the container
-        const containerAspect = canvas.width / canvas.height;
-        const imageAspect = img.naturalWidth / img.naturalHeight;
-        let renderedWidth, renderedHeight;
-  
-        if (imageAspect > containerAspect) {
-          renderedWidth = canvas.width;
-          renderedHeight = canvas.width / imageAspect;
-        } else {
-          renderedHeight = canvas.height;
-          renderedWidth = canvas.height * imageAspect;
-        }
-  
-        // Apply transformations relative to the canvas center
+
+        // Center the transformation origin
         ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.translate(position.x, position.y);
+        
+        // Apply user transformations, scaled to the full-res image
+        ctx.translate(position.x * scaleFactor, position.y * scaleFactor);
         ctx.rotate((rotation * Math.PI) / 180);
         ctx.scale(zoom, zoom);
-  
-        // Draw the image centered on the transformed context
-        ctx.drawImage(img, -renderedWidth / 2, -renderedHeight / 2, renderedWidth, renderedHeight);
+        
+        // Draw the image centered on the transformed origin
+        ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
         
         const editedImageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
   
