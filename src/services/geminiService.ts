@@ -110,7 +110,7 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
     throw new Error('Background removal failed. The model response did not contain image data.');
 
   } catch (error) {
-    handleApiError(error, 'remove background');
+    return handleApiError(error, 'remove background');
   }
 };
 
@@ -162,7 +162,7 @@ export const generateFashionImage = async (
     throw new Error('No image was generated. The model response did not contain image data.');
 
   } catch (error) {
-    handleApiError(error, 'generate image');
+    return handleApiError(error, 'generate image');
   }
 };
 
@@ -218,6 +218,6 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     throw new Error('Enhancement failed. The model response did not contain image data.');
 
   } catch (error) {
-    handleApiError(error, 'enhance image');
+    return handleApiError(error, 'enhance image');
   }
 };
