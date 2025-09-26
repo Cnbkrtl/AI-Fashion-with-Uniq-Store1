@@ -1,13 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { ImageUploader } from './components/ImageUploader';
 import { TextInput } from './components/TextInput';
 import { Spinner } from './components/Spinner';
-import { generateFashionImage, enhanceImage, removeBackground } from './services/geminiService';
+import { generateFashionImage, enhanceImage, removeBackground, isApiKeyAvailable } from './services/geminiService';
 import { Header } from './components/Header';
 import { ImageDisplay } from './components/ImageDisplay';
 import { ExportModal } from './components/ExportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MagicWandIcon } from './components/icons/MagicWandIcon';
+import { ApiErrorDisplay } from './components/ApiErrorDisplay';
 
 // Centralized type definitions for settings
 export interface ColorGradingSettings {
@@ -123,6 +124,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 
 const App: React.FC = () => {
+  const [isApiConfigured, setIsApiConfigured] = useState<boolean>(true);
   const [appSettings, setAppSettings] = useState<AppSettings>(loadInitialSettings);
   const [sourceImage, setSourceImage] = useState<File | null>(null);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
@@ -141,6 +143,11 @@ const App: React.FC = () => {
   const [rotation, setRotation] = useState<number>(0);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   
+  useEffect(() => {
+    // Check for the API key on initial render to avoid a blank screen
+    setIsApiConfigured(isApiKeyAvailable());
+  }, []);
+
   const setExportSettings = (updater: React.SetStateAction<ExportSettings>) => {
     setAppSettings(prev => {
         const newExportSettings = typeof updater === 'function' ? updater(prev.exportSettings) : updater;
@@ -410,6 +417,10 @@ const App: React.FC = () => {
   };
 
   const anyLoading = isLoading || isEnhancing || isRemovingBackground;
+
+  if (!isApiConfigured) {
+    return <ApiErrorDisplay />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">

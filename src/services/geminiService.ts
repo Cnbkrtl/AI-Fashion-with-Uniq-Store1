@@ -1,11 +1,16 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// Fix: Per coding guidelines, API key must be from process.env.API_KEY.
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set.");
-}
+// Initialize the client. If the API key is missing, pass an empty string.
+// The actual API calls will fail, which is handled below, but the app won't crash on import.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * Checks if the API_KEY environment variable is set.
+ * @returns {boolean} True if the API key is available, false otherwise.
+ */
+export const isApiKeyAvailable = (): boolean => {
+  return !!process.env.API_KEY;
+};
 
 // Helper function to convert File object to a base64 string
 const fileToInlineData = async (file: File): Promise<{mimeType: string, data: string}> => {
