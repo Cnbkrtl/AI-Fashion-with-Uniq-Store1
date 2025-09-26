@@ -53,10 +53,12 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        const base64ImageBytes: string = part.inlineData.data;
+        const base64ImageBytes: string = part.inlineData.data ?? '';
+        if (!base64ImageBytes) continue;
+
         const mimeType = part.inlineData.mimeType;
         // Ensure the mimeType is PNG for transparency
-        if (mimeType.toLowerCase() !== 'image/png') {
+        if (mimeType && mimeType.toLowerCase() !== 'image/png') {
             console.warn(`Model returned ${mimeType}, forcing PNG for transparency.`);
         }
         return `data:image/png;base64,${base64ImageBytes}`;
@@ -112,8 +114,10 @@ export const generateFashionImage = async (
     // Find the image part in the response
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        const base64ImageBytes: string = part.inlineData.data;
-        const mimeType = part.inlineData.mimeType;
+        const base64ImageBytes: string = part.inlineData.data ?? '';
+        if (!base64ImageBytes) continue;
+
+        const mimeType = part.inlineData.mimeType ?? 'image/jpeg';
         return `data:${mimeType};base64,${base64ImageBytes}`;
       }
     }
@@ -172,8 +176,10 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
-        const base64ImageBytes: string = part.inlineData.data;
-        const responseMimeType = part.inlineData.mimeType;
+        const base64ImageBytes: string = part.inlineData.data ?? '';
+        if (!base64ImageBytes) continue;
+        
+        const responseMimeType = part.inlineData.mimeType ?? 'image/jpeg';
         return `data:${responseMimeType};base64,${base64ImageBytes}`;
       }
     }
