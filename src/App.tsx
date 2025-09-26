@@ -2,15 +2,14 @@ import React, { useState, useCallback } from 'react';
 import { ImageUploader } from './components/ImageUploader';
 import { TextInput } from './components/TextInput';
 import { Spinner } from './components/Spinner';
-import { generateFashionImage, enhanceImage, removeBackground, isApiKeyAvailable, analyzeImageForPrompt } from './services/geminiService';
+import { generateFashionImage, enhanceImage, removeBackground } from './services/geminiService';
 import { Header } from './components/Header';
 import { ImageDisplay } from './components/ImageDisplay';
 import { ExportModal } from './components/ExportModal';
 import { SettingsModal } from './components/SettingsModal';
 import { MagicWandIcon } from './components/icons/MagicWandIcon';
-import { ApiErrorDisplay } from './components/ApiErrorDisplay';
-import { LightbulbIcon } from './components/icons/LightbulbIcon';
 import { useHistory } from './hooks/useHistory';
+import { ApiErrorDisplay } from './components/ApiErrorDisplay';
 
 // Centralized type definitions for settings
 export interface ColorGradingSettings {
@@ -40,18 +39,12 @@ export interface AppSettings {
   exportSettings: ExportSettings;
 }
 
-// Transformation state for image editing
+// State for image transformations
 export interface TransformationState {
   zoom: number;
   rotation: number;
   position: { x: number; y: number };
 }
-
-const initialTransformationState: TransformationState = {
-  zoom: 1,
-  rotation: 0,
-  position: { x: 0, y: 0 },
-};
 
 const SETTINGS_STORAGE_KEY = 'aiFashionStudioAppSettings';
 
@@ -137,32 +130,33 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
     return new File([u8arr], filename, {type:mime});
 }
 
-const ART_STYLES = [
-  "Photorealistic", "Cinematic", "Vintage Film", "Anime", 
-  "Fantasy Art", "Watercolor", "Impressionistic", "Art Deco", "Minimalist",
-  "Cyberpunk", "Surrealist", "Gothic"
-];
 
 const App: React.FC = () => {
-  const [isApiConfigured] = useState<boolean>(isApiKeyAvailable());
+  // Fix: Add API key check to prevent app crash and show a user-friendly message.
+  if (!process.env.API_KEY) {
+    return <ApiErrorDisplay />;
+  }
+
   const [appSettings, setAppSettings] = useState<AppSettings>(loadInitialSettings);
   const [sourceImage, setSourceImage] = useState<File | null>(null);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
-  const [sceneImage, setSceneImage] = useState<File | null>(null);
-  const [sceneImageUrl, setSceneImageUrl] = useState<string | null>(null);
   const [scenePrompt, setScenePrompt] = useState<string>(appSettings.defaultScenePrompt);
-  const [style, setStyle] = useState<string>(ART_STYLES[0]);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
   const [isRemovingBackground, setIsRemovingBackground] = useState<boolean>(false);
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
-  // State for image editing tools with undo/redo history
+  // Fix: Implement useHistory for undo/redo functionality on image transformations.
+  const initialTransform: TransformationState = {
+    zoom: 1,
+    rotation: 0,
+    position: { x: 0, y: 0 },
+  };
+
   const {
     state: transform,
     setState: setTransform,
@@ -171,7 +165,7 @@ const App: React.FC = () => {
     reset: resetTransform,
     canUndo: canUndoTransform,
     canRedo: canRedoTransform,
-  } = useHistory<TransformationState>(initialTransformationState);
+  } = useHistory<TransformationState>(initialTransform);
   
   const setExportSettings = (updater: React.SetStateAction<ExportSettings>) => {
     setAppSettings(prev => {
@@ -184,20 +178,17 @@ const App: React.FC = () => {
     setSourceImage(file);
     setSourceImageUrl(URL.createObjectURL(file));
     setGeneratedImage(null); // Clear previous generation on new upload
-  };
-
-  const handleSceneImageUpload = (file: File) => {
-    setSceneImage(file);
-    setSceneImageUrl(URL.createObjectURL(file));
+    resetTransform(initialTransform); // Reset transforms for new image
   };
   
-  const handleClearSceneImage = () => {
-    setSceneImage(null);
-    if (sceneImageUrl) {
-      URL.revokeObjectURL(sceneImageUrl);
-    }
-    setSceneImageUrl(null);
-  };
+  const handleClearSourceImage = useCallback(() => {
+    setSourceImage(null);
+    setSourceImageUrl(null);
+    setGeneratedImage(null);
+    setEnhancedImage(null);
+    setError(null);
+    resetTransform(initialTransform);
+  }, [resetTransform]);
 
   const handleRemoveBackground = useCallback(async () => {
     if (!sourceImage) {
@@ -221,26 +212,6 @@ const App: React.FC = () => {
     }
   }, [sourceImage]);
 
-  const handleAnalyzeImage = useCallback(async () => {
-    if (!sourceImage) {
-      setError('Please upload a source image to analyze.');
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setError(null);
-
-    try {
-      const description = await analyzeImageForPrompt(sourceImage);
-      setScenePrompt(prev => `${description}. ${prev}`);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to analyze image.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [sourceImage]);
-
   const handleGenerate = useCallback(async () => {
     if (!sourceImage) {
       setError('Please upload a source image first.');
@@ -252,22 +223,17 @@ const App: React.FC = () => {
     setGeneratedImage(null);
 
     try {
-      const imageUrl = await generateFashionImage({
-        imageFile: sourceImage,
-        sceneImage,
-        scenePrompt,
-        style,
-      });
+      const imageUrl = await generateFashionImage(sourceImage, scenePrompt);
       setGeneratedImage(imageUrl);
       // Reset editing transformations for the new image
-      resetTransform(initialTransformationState);
+      resetTransform(initialTransform);
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
-  }, [sourceImage, sceneImage, scenePrompt, style, resetTransform]);
+  }, [sourceImage, scenePrompt, resetTransform]);
 
   const downloadImage = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -296,33 +262,37 @@ const App: React.FC = () => {
         if (!container) {
           throw new Error("Could not find image container for processing.");
         }
-        
+  
         const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
         const ctx = canvas.getContext('2d');
-
+  
         if (!ctx) {
           throw new Error("Could not get canvas context.");
         }
-
-        const containerAspect = container.clientWidth / container.clientHeight;
+  
+        // Calculate the initial rendered size of the image to fit the container
+        const containerAspect = canvas.width / canvas.height;
         const imageAspect = img.naturalWidth / img.naturalHeight;
-        let renderedWidth;
+        let renderedWidth, renderedHeight;
+  
         if (imageAspect > containerAspect) {
-          renderedWidth = container.clientWidth;
+          renderedWidth = canvas.width;
+          renderedHeight = canvas.width / imageAspect;
         } else {
-          renderedWidth = container.clientHeight * imageAspect;
+          renderedHeight = canvas.height;
+          renderedWidth = canvas.height * imageAspect;
         }
-
-        const scaleFactor = img.naturalWidth / renderedWidth;
-
+  
+        // Apply transformations relative to the canvas center
         ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.translate(transform.position.x * scaleFactor, transform.position.y * scaleFactor);
+        ctx.translate(transform.position.x, transform.position.y);
         ctx.rotate((transform.rotation * Math.PI) / 180);
         ctx.scale(transform.zoom, transform.zoom);
-        
-        ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+  
+        // Draw the image centered on the transformed context
+        ctx.drawImage(img, -renderedWidth / 2, -renderedHeight / 2, renderedWidth, renderedHeight);
         
         const editedImageDataUrl = canvas.toDataURL('image/jpeg', 0.95);
   
@@ -473,11 +443,7 @@ const App: React.FC = () => {
     setShowSettingsModal(false);
   };
 
-  const anyLoading = isLoading || isEnhancing || isRemovingBackground || isAnalyzing;
-
-  if (!isApiConfigured) {
-    return <ApiErrorDisplay />;
-  }
+  const anyLoading = isLoading || isEnhancing || isRemovingBackground;
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
@@ -487,7 +453,12 @@ const App: React.FC = () => {
           {/* Controls Column */}
           <div className="lg:col-span-4 bg-gray-800/50 rounded-2xl shadow-lg p-6 flex flex-col gap-6 h-fit">
             <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3">1. Upload Your Model</h2>
-            <ImageUploader id="model-uploader" onImageUpload={handleImageUpload} imageUrl={sourceImageUrl} />
+            <ImageUploader
+              id="source-image-upload"
+              onImageUpload={handleImageUpload}
+              imageUrl={sourceImageUrl}
+              onClear={sourceImage ? handleClearSourceImage : undefined}
+            />
             
             <button
               onClick={handleRemoveBackground}
@@ -505,53 +476,19 @@ const App: React.FC = () => {
               )}
             </button>
             
-            <div className="border-b border-gray-700 pb-3 mt-4 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-cyan-400">2. Describe the New Scene</h2>
-              <button
-                onClick={handleAnalyzeImage}
-                disabled={!sourceImage || anyLoading || !!sceneImage}
-                className="flex items-center gap-1.5 text-sm bg-gray-700 hover:bg-gray-600 disabled:bg-gray-600/50 disabled:cursor-not-allowed disabled:text-gray-500 text-cyan-300 font-semibold py-1 px-3 rounded-full transition-all duration-300"
-                title={!!sceneImage ? "Analysis is disabled when a scene image is used." : "Analyze uploaded image to improve the prompt"}
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Spinner className="w-4 h-4" /> Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <LightbulbIcon className="w-4 h-4" /> Analyze & Suggest
-                  </>
-                )}
-              </button>
-            </div>
+            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">2. Describe the New Scene</h2>
             <TextInput
               label="Describe the entire scene..."
               value={scenePrompt}
               onChange={(e) => setScenePrompt(e.target.value)}
               placeholder="e.g., A woman standing confidently on a balcony overlooking the sea at sunset."
-              rows={4}
+              rows={6}
             />
-             <div>
-              <label htmlFor="style-select" className="block text-sm font-medium text-gray-300 mb-2">Artistic Style</label>
-              <select 
-                id="style-select"
-                value={style}
-                onChange={e => setStyle(e.target.value)}
-                className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all duration-200"
-              >
-                {ART_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
             
-            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">3. (Optional) Upload a Scene</h2>
-            <ImageUploader id="scene-uploader" onImageUpload={handleSceneImageUpload} imageUrl={sceneImageUrl} onClear={handleClearSceneImage} />
-
-
-            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">4. Generate</h2>
             <button
               onClick={handleGenerate}
               disabled={anyLoading || !sourceImage}
-              className="w-full flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
+              className="mt-4 w-full flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
             >
               {isLoading ? (
                 <>
@@ -579,7 +516,7 @@ const App: React.FC = () => {
               onRedo={redoTransform}
               canUndo={canUndoTransform}
               canRedo={canRedoTransform}
-              onReset={() => resetTransform(initialTransformationState)}
+              onReset={() => resetTransform(initialTransform)}
             />
           </div>
         </div>
