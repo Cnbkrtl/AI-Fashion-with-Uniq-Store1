@@ -486,7 +486,7 @@ const App: React.FC = () => {
           {/* Controls Column */}
           <div className="lg:col-span-4 bg-gray-800/50 rounded-2xl shadow-lg p-6 flex flex-col gap-6 h-fit">
             <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3">1. Upload Your Model</h2>
-            <ImageUploader onImageUpload={handleImageUpload} imageUrl={sourceImageUrl} />
+            <ImageUploader id="model-uploader" onImageUpload={handleImageUpload} imageUrl={sourceImageUrl} />
             
             <button
               onClick={handleRemoveBackground}
@@ -543,7 +543,7 @@ const App: React.FC = () => {
             </div>
             
             <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">3. (Optional) Upload a Scene</h2>
-            <ImageUploader onImageUpload={handleSceneImageUpload} imageUrl={sceneImageUrl} onClear={handleClearSceneImage} />
+            <ImageUploader id="scene-uploader" onImageUpload={handleSceneImageUpload} imageUrl={sceneImageUrl} onClear={handleClearSceneImage} />
 
 
             <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">4. Generate</h2>

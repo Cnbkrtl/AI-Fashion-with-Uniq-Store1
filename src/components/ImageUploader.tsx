@@ -3,12 +3,13 @@ import { UploadIcon } from './icons/UploadIcon';
 import { ClearIcon } from './icons/ClearIcon';
 
 interface ImageUploaderProps {
+  id: string;
   onImageUpload: (file: File) => void;
   imageUrl: string | null;
   onClear?: () => void;
 }
 
-export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, imageUrl, onClear }) => {
+export const ImageUploader: React.FC<ImageUploaderProps> = ({ id, onImageUpload, imageUrl, onClear }) => {
   const [isDragging, setIsDragging] = useState(false);
   const uploaderRef = useRef<HTMLLabelElement>(null);
 
@@ -67,7 +68,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, ima
     <div>
       <input
         type="file"
-        id="image-upload"
+        id={id}
         className="hidden"
         accept="image/png, image/jpeg, image/webp"
         onChange={handleFileChange}
@@ -75,7 +76,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload, ima
       <label
         ref={uploaderRef}
         tabIndex={0}
-        htmlFor="image-upload"
+        htmlFor={id}
         className={uploaderClass}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
