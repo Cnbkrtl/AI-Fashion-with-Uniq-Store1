@@ -81,7 +81,7 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
       }
     }
 
-    const textResponse = response.text?.trim();
+    const textResponse = (response.text ?? "").trim();
     if (textResponse) {
       throw new Error(`The model returned a text response instead of an image: "${textResponse}"`);
     }
@@ -133,7 +133,7 @@ export const generateFashionImage = async ({
   let combinedPrompt = `Generate a new fashion editorial image in a ${style} style. Use the provided image of a person as a strong visual reference for their appearance, clothing, hair, and general physical characteristics.`;
 
   if (sceneImage) {
-    combinedPrompt += ` Place this person into the environment from the provided scene image. The scene description is: "${scenePrompt}". The final image should seamlessly blend the person into the new background, matching the lighting and atmosphere.`;
+    combinedPrompt += ` Place this person into the environment from the provided scene image. The scene description is: "${scenePrompt}". The final image should seamlessly blend the person into the new background, matching the lighting and atmosphere. CRITICAL: The aspect ratio of the generated image MUST match the aspect ratio of the first input image (the model), NOT the second image (the scene).`;
   } else {
     combinedPrompt += ` The scene is described as: "${scenePrompt}". The person's pose and the background environment should be newly generated based on this description.`;
   }
@@ -161,7 +161,7 @@ export const generateFashionImage = async ({
       }
     }
 
-    const textResponse = response.text?.trim();
+    const textResponse = (response.text ?? "").trim();
     if (textResponse) {
       throw new Error(`The model returned a text response instead of an image: "${textResponse}"`);
     }
@@ -222,7 +222,7 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
       }
     }
     
-    const textResponse = response.text?.trim();
+    const textResponse = (response.text ?? "").trim();
     if (textResponse) {
       throw new Error(`The enhancement model returned text instead of an image: "${textResponse}"`);
     }
@@ -261,7 +261,7 @@ export const analyzeImageForPrompt = async (imageFile: File): Promise<string> =>
         },
       });
 
-      const text = response.text?.trim();
+      const text = (response.text ?? "").trim();
 
       if (!text) {
         throw new Error('Analysis failed: the model returned an empty response.');
