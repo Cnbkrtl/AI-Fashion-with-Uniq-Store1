@@ -144,6 +144,7 @@ const App: React.FC = () => {
   const [backgroundRefImage, setBackgroundRefImage] = useState<File | null>(null);
   const [backgroundRefImageUrl, setBackgroundRefImageUrl] = useState<string | null>(null);
   const [scenePrompt, setScenePrompt] = useState<string>(appSettings.defaultScenePrompt);
+  const [style, setStyle] = useState<string>('Photorealistic');
   const [aspectRatio, setAspectRatio] = useState<'portrait' | 'landscape'>('portrait');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -239,7 +240,7 @@ const App: React.FC = () => {
     setGeneratedImage(null);
 
     try {
-      const imageUrl = await generateFashionImage(sourceImage, scenePrompt, aspectRatio, backgroundRefImage);
+      const imageUrl = await generateFashionImage(sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style);
       setGeneratedImage(imageUrl);
       // FIX: Reset editing transformations for the new image using the history hook.
       resetTransform(initialTransformState);
@@ -249,7 +250,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [sourceImage, scenePrompt, aspectRatio, backgroundRefImage, resetTransform]);
+  }, [sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style, resetTransform]);
 
   const downloadImage = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -495,6 +496,25 @@ const App: React.FC = () => {
               placeholder="e.g., A woman standing confidently on a balcony overlooking the sea at sunset."
               rows={4}
             />
+
+            <div>
+              <label htmlFor="style-selector" className="block text-sm font-medium text-gray-300 mb-2">Artistic Style</label>
+              <select
+                id="style-selector"
+                value={style}
+                onChange={(e) => setStyle(e.target.value)}
+                className="w-full p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all duration-200"
+              >
+                <option>Photorealistic</option>
+                <option>Cinematic</option>
+                <option>Vintage Film</option>
+                <option>Minimalist</option>
+                <option>Futuristic</option>
+                <option>Fantasy Art</option>
+                <option>Watercolor</option>
+                <option>Noir</option>
+              </select>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Aspect Ratio</label>

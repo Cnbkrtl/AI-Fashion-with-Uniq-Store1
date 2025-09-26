@@ -86,7 +86,8 @@ export const generateFashionImage = async (
   imageFile: File,
   scenePrompt: string,
   aspectRatio: 'portrait' | 'landscape',
-  backgroundRefFile: File | null
+  backgroundRefFile: File | null,
+  style: string
 ): Promise<string> => {
   const model = 'gemini-2.5-flash-image-preview';
 
@@ -100,6 +101,9 @@ export const generateFashionImage = async (
   )[] = [imagePart];
 
   let combinedPrompt: string;
+  const stylePrompt = style && style.toLowerCase() !== 'photorealistic' 
+    ? `in a ${style.toLowerCase()} style` 
+    : 'in a photorealistic style';
   
   if (backgroundRefFile) {
     const backgroundRefPart = {
@@ -108,9 +112,9 @@ export const generateFashionImage = async (
     parts.push(backgroundRefPart);
     // The prompt needs to be very specific about which image is which.
     // The model will see parts in order: [model_image, background_image, text_prompt]
-    combinedPrompt = `Using the first image for the person and their clothing, and using the second image as a strong visual reference for the background environment and style, generate a new fashion editorial image. The scene is described as: "${scenePrompt}". Recreate the person's appearance and clothing from the first image. The person's pose and the overall composition should be newly generated to fit the described scene and the style of the reference background.`;
+    combinedPrompt = `Using the first image for the person and their clothing, and using the second image as a strong visual reference for the background environment and style, generate a new fashion editorial image ${stylePrompt}. The scene is described as: "${scenePrompt}". Recreate the person's appearance and clothing from the first image. The person's pose and the overall composition should be newly generated to fit the described scene and the style of the reference background.`;
   } else {
-    combinedPrompt = `Generate a new fashion editorial image based on the scene description: "${scenePrompt}". Use the provided image of a person as a strong visual reference for their appearance and clothing. Recreate the style of the outfit, the person's hair, and general physical characteristics in the new scene. The person's pose and the background environment should be newly generated based on the scene description.`;
+    combinedPrompt = `Generate a new fashion editorial image ${stylePrompt} based on the scene description: "${scenePrompt}". Use the provided image of a person as a strong visual reference for their appearance and clothing. Recreate the style of the outfit, the person's hair, and general physical characteristics in the new scene. The person's pose and the background environment should be newly generated based on the scene description.`;
   }
   
   if (aspectRatio === 'portrait') {
