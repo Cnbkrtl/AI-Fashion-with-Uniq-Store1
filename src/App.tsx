@@ -309,7 +309,8 @@ const App: React.FC = () => {
 
   const applyTransformationsToImage = useCallback((
     baseImageUrl: string,
-    transformState: TransformationState
+    transformState: TransformationState,
+    containerSize: { width: number; height: number }
   ): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -322,12 +323,30 @@ const App: React.FC = () => {
         
         const { naturalWidth: w, naturalHeight: h } = img;
         const { zoom, rotation, position } = transformState;
+
+        // Calculate the scale factor between the displayed image and the natural image
+        const containerAspect = containerSize.width / containerSize.height;
+        const imageAspect = w / h;
         
+        let renderedWidth;
+        if (imageAspect > containerAspect) {
+            // Image is wider than container, so width is the constraint
+            renderedWidth = containerSize.width;
+        } else {
+            // Image is taller than or equal to container aspect, so height is the constraint
+            const renderedHeight = containerSize.height;
+            renderedWidth = renderedHeight * imageAspect;
+        }
+
+        const scaleFactor = w / renderedWidth;
+
+        // Apply transformations in image coordinate space
         canvas.width = w;
         canvas.height = h;
 
         ctx.translate(w / 2, h / 2);
-        ctx.translate(position.x, position.y);
+        // Translate position from screen space to image space
+        ctx.translate(position.x * scaleFactor, position.y * scaleFactor);
         ctx.rotate((rotation * Math.PI) / 180);
         ctx.scale(zoom, zoom);
         ctx.drawImage(img, -w / 2, -h / 2, w, h);
@@ -345,6 +364,13 @@ const App: React.FC = () => {
       setError('No generated image to finalize.');
       return;
     }
+    
+    const container = document.querySelector('#ai-generated-image-display .generated-image-container');
+    if (!container) {
+        setError("Could not find the image display area to process edits. Please try again.");
+        return;
+    }
+    const containerSize = { width: container.clientWidth, height: container.clientHeight };
   
     setIsEnhancing(true);
     setError(null);
@@ -355,7 +381,7 @@ const App: React.FC = () => {
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(latestSettings));
 
       // Step 1: Apply user edits (zoom, rotate, pan) before enhancement
-      const editedImageDataUrl = await applyTransformationsToImage(generatedImage, transform);
+      const editedImageDataUrl = await applyTransformationsToImage(generatedImage, transform, containerSize);
   
       // Step 2: Enhance the edited image
       const enhancedImageUrl = await enhanceImage(editedImageDataUrl, latestSettings.exportSettings.enhancement);
@@ -616,6 +642,7 @@ const App: React.FC = () => {
           <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
             <ImageDisplay title="Original Image" imageUrl={sourceImageUrl} />
             <ImageDisplay 
+              id="ai-generated-image-display"
               title="AI Generated Image" 
               imageUrl={generatedImage} 
               isLoading={isLoading}

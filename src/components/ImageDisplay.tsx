@@ -11,6 +11,7 @@ import { TransformationState } from '../App';
 
 
 interface ImageDisplayProps {
+  id?: string;
   title: string;
   imageUrl: string | null;
   isLoading?: boolean;
@@ -48,6 +49,7 @@ const FASHION_ENHANCEMENT_MESSAGES = [
 
 
 export const ImageDisplay: React.FC<ImageDisplayProps> = ({
+  id,
   title,
   imageUrl,
   isLoading = false,
@@ -154,7 +156,7 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   const displayPosition = isDragging ? transientPosition : position;
 
   return (
-    <div className="bg-gray-800/50 rounded-2xl shadow-lg p-4 flex flex-col gap-4">
+    <div id={id} className="bg-gray-800/50 rounded-2xl shadow-lg p-4 flex flex-col gap-4">
       <h3 className="text-lg font-semibold text-purple-400 mb-0 text-center">{title}</h3>
       <div 
         className="aspect-w-3 aspect-h-4 bg-gray-900/50 rounded-lg flex-grow flex items-center justify-center overflow-hidden relative generated-image-container"
