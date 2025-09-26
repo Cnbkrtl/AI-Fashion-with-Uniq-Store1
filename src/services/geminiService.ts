@@ -85,7 +85,8 @@ export const removeBackground = async (imageFile: File): Promise<string> => {
 export const generateFashionImage = async (
   imageFile: File,
   scenePrompt: string,
-  aspectRatio: 'portrait' | 'landscape'
+  aspectRatio: 'portrait' | 'landscape',
+  backgroundRefFile: File | null
 ): Promise<string> => {
   const model = 'gemini-2.5-flash-image-preview';
 
@@ -93,8 +94,24 @@ export const generateFashionImage = async (
     inlineData: await fileToInlineData(imageFile)
   };
 
-  // Revised prompt to be less restrictive and align with model capabilities.
-  let combinedPrompt = `Generate a new fashion editorial image based on the scene description: "${scenePrompt}". Use the provided image of a person as a strong visual reference for their appearance and clothing. Recreate the style of the outfit, the person's hair, and general physical characteristics in the new scene. The person's pose and the background environment should be newly generated based on the scene description.`;
+  const parts: (
+    | { inlineData: { mimeType: string; data: string } }
+    | { text: string }
+  )[] = [imagePart];
+
+  let combinedPrompt: string;
+  
+  if (backgroundRefFile) {
+    const backgroundRefPart = {
+      inlineData: await fileToInlineData(backgroundRefFile),
+    };
+    parts.push(backgroundRefPart);
+    // The prompt needs to be very specific about which image is which.
+    // The model will see parts in order: [model_image, background_image, text_prompt]
+    combinedPrompt = `Using the first image for the person and their clothing, and using the second image as a strong visual reference for the background environment and style, generate a new fashion editorial image. The scene is described as: "${scenePrompt}". Recreate the person's appearance and clothing from the first image. The person's pose and the overall composition should be newly generated to fit the described scene and the style of the reference background.`;
+  } else {
+    combinedPrompt = `Generate a new fashion editorial image based on the scene description: "${scenePrompt}". Use the provided image of a person as a strong visual reference for their appearance and clothing. Recreate the style of the outfit, the person's hair, and general physical characteristics in the new scene. The person's pose and the background environment should be newly generated based on the scene description.`;
+  }
   
   if (aspectRatio === 'portrait') {
     combinedPrompt += ` CRITICAL: The final generated image must have a portrait aspect ratio (9:16).`;
@@ -103,16 +120,14 @@ export const generateFashionImage = async (
   }
   
   combinedPrompt += ` The result should be a cohesive, high-quality photograph.`;
-
-  const textPart = {
-    text: combinedPrompt,
-  };
+  
+  parts.push({ text: combinedPrompt });
   
   try {
     const response = await ai.models.generateContent({
       model: model,
       contents: {
-        parts: [imagePart, textPart],
+        parts: parts,
       },
       config: {
         // Nano Banana requires both IMAGE and TEXT modalities

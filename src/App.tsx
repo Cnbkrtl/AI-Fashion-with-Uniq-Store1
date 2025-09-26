@@ -141,6 +141,8 @@ const App: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>(loadInitialSettings);
   const [sourceImage, setSourceImage] = useState<File | null>(null);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
+  const [backgroundRefImage, setBackgroundRefImage] = useState<File | null>(null);
+  const [backgroundRefImageUrl, setBackgroundRefImageUrl] = useState<string | null>(null);
   const [scenePrompt, setScenePrompt] = useState<string>(appSettings.defaultScenePrompt);
   const [aspectRatio, setAspectRatio] = useState<'portrait' | 'landscape'>('portrait');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -169,11 +171,39 @@ const App: React.FC = () => {
         return { ...prev, exportSettings: newExportSettings };
     });
   };
-
+  
   const handleImageUpload = (file: File) => {
+    if (sourceImageUrl) {
+        URL.revokeObjectURL(sourceImageUrl);
+    }
     setSourceImage(file);
     setSourceImageUrl(URL.createObjectURL(file));
     setGeneratedImage(null); // Clear previous generation on new upload
+  };
+
+  const handleClearSourceImage = () => {
+    if (sourceImageUrl) {
+      URL.revokeObjectURL(sourceImageUrl);
+    }
+    setSourceImage(null);
+    setSourceImageUrl(null);
+    setGeneratedImage(null);
+  }
+
+  const handleBackgroundRefUpload = (file: File) => {
+    if (backgroundRefImageUrl) {
+        URL.revokeObjectURL(backgroundRefImageUrl);
+    }
+    setBackgroundRefImage(file);
+    setBackgroundRefImageUrl(URL.createObjectURL(file));
+  };
+
+  const handleClearBackgroundRef = () => {
+    if (backgroundRefImageUrl) {
+      URL.revokeObjectURL(backgroundRefImageUrl);
+    }
+    setBackgroundRefImage(null);
+    setBackgroundRefImageUrl(null);
   };
 
   const handleRemoveBackground = useCallback(async () => {
@@ -209,7 +239,7 @@ const App: React.FC = () => {
     setGeneratedImage(null);
 
     try {
-      const imageUrl = await generateFashionImage(sourceImage, scenePrompt, aspectRatio);
+      const imageUrl = await generateFashionImage(sourceImage, scenePrompt, aspectRatio, backgroundRefImage);
       setGeneratedImage(imageUrl);
       // FIX: Reset editing transformations for the new image using the history hook.
       resetTransform(initialTransformState);
@@ -219,7 +249,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [sourceImage, scenePrompt, aspectRatio, resetTransform]);
+  }, [sourceImage, scenePrompt, aspectRatio, backgroundRefImage, resetTransform]);
 
   const downloadImage = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -439,7 +469,7 @@ const App: React.FC = () => {
           {/* Controls Column */}
           <div className="lg:col-span-4 bg-gray-800/50 rounded-2xl shadow-lg p-6 flex flex-col gap-6 h-fit">
             <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3">1. Upload Your Model</h2>
-            <ImageUploader id="source-image-uploader" onImageUpload={handleImageUpload} imageUrl={sourceImageUrl} />
+            <ImageUploader id="source-image-uploader" onImageUpload={handleImageUpload} imageUrl={sourceImageUrl} onClear={handleClearSourceImage} />
             
             <button
               onClick={handleRemoveBackground}
@@ -457,13 +487,13 @@ const App: React.FC = () => {
               )}
             </button>
             
-            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">2. Describe the New Scene</h2>
+            <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">2. Design the Photoshoot</h2>
             <TextInput
-              label="Describe the entire scene..."
+              label="Describe the scene and pose"
               value={scenePrompt}
               onChange={(e) => setScenePrompt(e.target.value)}
               placeholder="e.g., A woman standing confidently on a balcony overlooking the sea at sunset."
-              rows={6}
+              rows={4}
             />
 
             <div>
@@ -484,6 +514,17 @@ const App: React.FC = () => {
                   <span>Landscape (16:9)</span>
                 </button>
               </div>
+            </div>
+
+            <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Background Reference (Optional)</label>
+                <ImageUploader
+                    id="background-ref-uploader"
+                    onImageUpload={handleBackgroundRefUpload}
+                    imageUrl={backgroundRefImageUrl}
+                    onClear={handleClearBackgroundRef}
+                />
+                <p className="text-xs text-gray-500 text-center mt-2">Use an image for background style inspiration.</p>
             </div>
             
             <button
