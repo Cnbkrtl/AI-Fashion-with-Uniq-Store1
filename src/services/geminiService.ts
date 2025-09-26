@@ -103,6 +103,7 @@ interface GenerateImageParams {
   sceneImage: File | null;
   scenePrompt: string;
   style: string;
+  aspectRatio: 'portrait' | 'landscape';
 }
 
 export const generateFashionImage = async ({
@@ -110,6 +111,7 @@ export const generateFashionImage = async ({
   sceneImage,
   scenePrompt,
   style,
+  aspectRatio,
 }: GenerateImageParams): Promise<string> => {
   if (!ai) {
     throw new Error("Gemini API is not initialized. Is the API_KEY environment variable set?");
@@ -133,10 +135,17 @@ export const generateFashionImage = async ({
   let combinedPrompt = `Generate a new fashion editorial image in a ${style} style. Use the provided image of a person as a strong visual reference for their appearance, clothing, hair, and general physical characteristics.`;
 
   if (sceneImage) {
-    combinedPrompt += ` Place this person into the environment from the provided scene image. The scene description is: "${scenePrompt}". The final image should seamlessly blend the person into the new background, matching the lighting and atmosphere. CRITICAL: The aspect ratio of the generated image MUST match the aspect ratio of the first input image (the model), NOT the second image (the scene).`;
+    combinedPrompt += ` Place this person into the environment from the provided scene image. The scene description is: "${scenePrompt}". The final image should seamlessly blend the person into the new background, matching the lighting and atmosphere.`;
   } else {
     combinedPrompt += ` The scene is described as: "${scenePrompt}". The person's pose and the background environment should be newly generated based on this description.`;
   }
+  
+  if (aspectRatio === 'portrait') {
+    combinedPrompt += ` CRITICAL: The final generated image must have a portrait aspect ratio (9:16).`;
+  } else {
+    combinedPrompt += ` CRITICAL: The final generated image must have a landscape aspect ratio (16:9).`;
+  }
+
   combinedPrompt += ` The result must be a cohesive, high-quality photograph.`;
 
   const textPart = { text: combinedPrompt };

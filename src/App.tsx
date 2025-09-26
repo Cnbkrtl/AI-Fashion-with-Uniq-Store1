@@ -11,6 +11,8 @@ import { MagicWandIcon } from './components/icons/MagicWandIcon';
 import { ApiErrorDisplay } from './components/ApiErrorDisplay';
 import { LightbulbIcon } from './components/icons/LightbulbIcon';
 import { useHistory } from './hooks/useHistory';
+import { PortraitIcon } from './components/icons/PortraitIcon';
+import { LandscapeIcon } from './components/icons/LandscapeIcon';
 
 // Centralized type definitions for settings
 export interface ColorGradingSettings {
@@ -152,6 +154,7 @@ const App: React.FC = () => {
   const [sceneImageUrl, setSceneImageUrl] = useState<string | null>(null);
   const [scenePrompt, setScenePrompt] = useState<string>(appSettings.defaultScenePrompt);
   const [style, setStyle] = useState<string>(ART_STYLES[0]);
+  const [aspectRatio, setAspectRatio] = useState<'portrait' | 'landscape'>('portrait');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
@@ -257,6 +260,7 @@ const App: React.FC = () => {
         sceneImage,
         scenePrompt,
         style,
+        aspectRatio,
       });
       setGeneratedImage(imageUrl);
       // Reset editing transformations for the new image
@@ -267,7 +271,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [sourceImage, sceneImage, scenePrompt, style, resetTransform]);
+  }, [sourceImage, sceneImage, scenePrompt, style, aspectRatio, resetTransform]);
 
   const downloadImage = (dataUrl: string, filename: string) => {
     const link = document.createElement('a');
@@ -543,6 +547,26 @@ const App: React.FC = () => {
               </select>
             </div>
             
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Aspect Ratio</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setAspectRatio('portrait')}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg transition-colors text-sm font-semibold ${aspectRatio === 'portrait' ? 'bg-cyan-500 text-gray-900' : 'bg-gray-700/50 hover:bg-gray-600/50'}`}
+                >
+                  <PortraitIcon className="w-4 h-4" />
+                  <span>Dikey (9:16)</span>
+                </button>
+                <button
+                  onClick={() => setAspectRatio('landscape')}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg transition-colors text-sm font-semibold ${aspectRatio === 'landscape' ? 'bg-cyan-500 text-gray-900' : 'bg-gray-700/50 hover:bg-gray-600/50'}`}
+                >
+                  <LandscapeIcon className="w-4 h-4" />
+                  <span>Yatay (16:9)</span>
+                </button>
+              </div>
+            </div>
+
             <h2 className="text-xl font-bold text-cyan-400 border-b border-gray-700 pb-3 mt-4">3. (Optional) Upload a Scene</h2>
             <ImageUploader id="scene-uploader" onImageUpload={handleSceneImageUpload} imageUrl={sceneImageUrl} onClear={handleClearSceneImage} />
 
