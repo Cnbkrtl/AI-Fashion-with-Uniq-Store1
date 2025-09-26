@@ -186,9 +186,9 @@ export const enhanceImage = async (base64ImageDataUri: string): Promise<string> 
     }
   };
 
-  // A more forceful prompt to demand higher technical quality and sharpness.
+  // New, highly-specific prompt for professional-grade enhancement and cleaning.
   const textPart = {
-    text: "Dramatically enhance this image to an ultra-realistic, 4K resolution quality. Your task is to upscale the image, sharpen every detail, and improve its overall clarity to match that of a professional DSLR photograph. Focus on making textures in clothing crisp, ensuring skin tones are lifelike, and refining the lighting and shadows for a photorealistic effect. CRITICAL: You must not alter the content in any way. The person's appearance, their pose, the clothing, and the background must remain exactly the same. This is a technical enhancement, not a creative change.",
+    text: "Perform a professional-grade enhancement on this image. Your primary goal is to increase the resolution and sharpen details for a crystal-clear, high-fidelity result. CRITICAL: It is absolutely essential to eliminate all digital noise, grain, and compression artifacts. The final image must be perfectly clean and smooth, especially in flat areas and color gradients. The result should look like it was captured with a high-end studio camera, not like a digitally over-processed image. Do not alter the content in any way—the person's appearance, clothing, pose, and background must remain exactly the same. This is a technical quality enhancement only.",
   };
 
   try {
