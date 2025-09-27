@@ -167,6 +167,27 @@ const initialTransformState: TransformationState = {
   position: { x: 0, y: 0 },
 };
 
+const createCanvasDownload = (
+    canvas: HTMLCanvasElement, 
+    format: 'png' | 'jpeg', 
+    quality: number
+): Promise<{ url: string; filename: string }> => {
+    return new Promise((resolve, reject) => {
+        const mimeType = `image/${format}`;
+        const filename = `ai-fashion-studio-final.${format}`;
+        const qualityValue = format === 'jpeg' ? quality / 100 : undefined;
+
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                return reject(new Error('Failed to create image data for download. The canvas may be empty or too large.'));
+            }
+            const url = URL.createObjectURL(blob);
+            resolve({ url, filename });
+        }, mimeType, qualityValue);
+    });
+};
+
+
 const App: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>(loadInitialSettings);
   const [sourceImage, setSourceImage] = useState<File | null>(null);
@@ -184,6 +205,8 @@ const App: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [promptIdeaIndex, setPromptIdeaIndex] = useState(0);
+  const [finalizedImage, setFinalizedImage] = useState<{ url: string; filename: string } | null>(null);
+
 
   const {
     state: transform,
@@ -205,8 +228,18 @@ const App: React.FC = () => {
       if (backgroundRefImageUrl) {
         URL.revokeObjectURL(backgroundRefImageUrl);
       }
+      if (finalizedImage) {
+        URL.revokeObjectURL(finalizedImage.url);
+      }
     };
-  }, [sourceImageUrl, backgroundRefImageUrl]);
+  }, [sourceImageUrl, backgroundRefImageUrl, finalizedImage]);
+
+  const handleClearFinalizedImage = useCallback(() => {
+    if (finalizedImage) {
+        URL.revokeObjectURL(finalizedImage.url);
+        setFinalizedImage(null);
+    }
+  }, [finalizedImage]);
 
   const setExportSettings = (updater: React.SetStateAction<ExportSettings>) => {
     setAppSettings(prev => {
@@ -222,6 +255,7 @@ const App: React.FC = () => {
     setSourceImage(file);
     setSourceImageUrl(URL.createObjectURL(file));
     setGeneratedImage(null); // Clear previous generation on new upload
+    handleClearFinalizedImage();
   };
 
   const handleClearSourceImage = () => {
@@ -231,6 +265,7 @@ const App: React.FC = () => {
     setSourceImage(null);
     setSourceImageUrl(null);
     setGeneratedImage(null);
+    handleClearFinalizedImage();
   }
 
   const handleBackgroundRefUpload = (file: File) => {
@@ -285,6 +320,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setGeneratedImage(null);
+    handleClearFinalizedImage();
 
     try {
       const imageUrl = await generateFashionImage(sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style);
@@ -296,43 +332,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style, resetTransform]);
-
-  const triggerCanvasDownload = useCallback((
-    canvas: HTMLCanvasElement, 
-    format: 'png' | 'jpeg', 
-    quality: number
-  ): Promise<void> => {
-      return new Promise((resolve, reject) => {
-          const mimeType = `image/${format}`;
-          const filename = `ai-fashion-photoshoot-final.${format}`;
-          const qualityValue = format === 'jpeg' ? quality / 100 : undefined;
-  
-          canvas.toBlob((blob) => {
-              if (!blob) {
-                  return reject(new Error('Failed to create image data for download. The canvas may be empty or too large.'));
-              }
-              
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = filename;
-              
-              document.body.appendChild(link);
-              try {
-                  link.click();
-                  resolve();
-              } catch (err) {
-                  console.error("Download trigger failed:", err);
-                  reject(new Error("The download could not be started. Your browser might be blocking it."));
-              } finally {
-                  document.body.removeChild(link);
-                  // A small timeout before revoking gives the browser time to start the download
-                  setTimeout(() => URL.revokeObjectURL(url), 150); 
-              }
-          }, mimeType, qualityValue);
-      });
-  }, []);
+  }, [sourceImage, scenePrompt, aspectRatio, backgroundRefImage, style, resetTransform, handleClearFinalizedImage]);
 
   const applyTransformationsToImage = useCallback((
     baseImageUrl: string,
@@ -423,22 +423,22 @@ const App: React.FC = () => {
   
     setIsEnhancing(true);
     setError(null);
-    setShowExportModal(false);
   
     try {
+      handleClearFinalizedImage();
       const latestSettings = { ...appSettings };
       localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(latestSettings));
 
       const editedImageDataUrl = await applyTransformationsToImage(generatedImage, transform, containerSize);
       const enhancedImageUrl = await enhanceImage(editedImageDataUrl, latestSettings.exportSettings.enhancement);
   
-      await new Promise<void>((resolve, reject) => {
+      const downloadData = await new Promise<{ url: string; filename: string }>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error("Image loading timed out. The enhancement API may have returned an invalid image."));
         }, 15000);
 
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           clearTimeout(timeout);
           try {
             const canvas = document.createElement('canvas');
@@ -521,12 +521,8 @@ const App: React.FC = () => {
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             }
             
-            const format = latestSettings.exportSettings.format;
-            const quality = latestSettings.exportSettings.quality;
-
-            triggerCanvasDownload(canvas, format, quality)
-              .then(resolve)
-              .catch(reject);
+            const data = await createCanvasDownload(canvas, latestSettings.exportSettings.format, latestSettings.exportSettings.quality);
+            resolve(data);
 
           } catch (e) {
             reject(e);
@@ -538,6 +534,9 @@ const App: React.FC = () => {
         };
         img.src = enhancedImageUrl;
       });
+      
+      setFinalizedImage(downloadData);
+      setShowExportModal(false);
   
     } catch (err) {
       console.error("Finalization failed:", err);
@@ -545,7 +544,7 @@ const App: React.FC = () => {
     } finally {
       setIsEnhancing(false);
     }
-  }, [generatedImage, appSettings, transform, applyTransformationsToImage, triggerCanvasDownload]);
+  }, [generatedImage, appSettings, transform, applyTransformationsToImage, handleClearFinalizedImage]);
 
   const handleSaveSettings = (newSettings: AppSettings) => {
     setAppSettings(newSettings);
@@ -689,6 +688,8 @@ const App: React.FC = () => {
               canUndo={canUndoTransform}
               canRedo={canRedoTransform}
               onReset={() => resetTransform(initialTransformState)}
+              finalizedImage={finalizedImage}
+              onClearFinalizedImage={handleClearFinalizedImage}
             />
           </div>
         </div>

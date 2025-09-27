@@ -259,7 +259,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         <footer className="flex items-center justify-end p-4 border-t border-gray-700 bg-gray-800 flex-shrink-0">
             <button onClick={onClose} disabled={isProcessing} className="px-4 py-2 text-gray-300 rounded hover:bg-gray-700 mr-2 transition-colors disabled:opacity-50">Cancel</button>
             <button onClick={onDownload} disabled={isProcessing} className="px-6 py-2 bg-cyan-500 text-gray-900 font-bold rounded hover:bg-cyan-400 transition-transform transform hover:scale-105 w-40 flex items-center justify-center disabled:bg-gray-600 disabled:cursor-not-allowed">
-              {isProcessing ? <Spinner /> : 'Download Image'}
+              {isProcessing ? <Spinner /> : 'Finalize Image'}
             </button>
         </footer>
       </div>

@@ -8,6 +8,8 @@ import { ResetZoomIcon } from './icons/ResetZoomIcon';
 import { UndoIcon } from './icons/UndoIcon';
 import { RedoIcon } from './icons/RedoIcon';
 import { TransformationState } from '../App';
+import { DownloadIcon } from './icons/DownloadIcon';
+import { ClearIcon } from './icons/ClearIcon';
 
 
 interface ImageDisplayProps {
@@ -24,6 +26,9 @@ interface ImageDisplayProps {
   canUndo?: boolean;
   canRedo?: boolean;
   onReset?: () => void;
+  // FIX: Make finalizedImage and onClearFinalizedImage optional to support components that don't need them.
+  finalizedImage?: { url: string; filename: string } | null;
+  onClearFinalizedImage?: () => void;
 }
 
 const FASHION_GENERATION_MESSAGES = [
@@ -61,7 +66,9 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
   onRedo,
   canUndo,
   canRedo,
-  onReset
+  onReset,
+  finalizedImage,
+  onClearFinalizedImage
 }) => {
   const showLoading = isLoading || isEnhancing;
 
@@ -250,6 +257,27 @@ export const ImageDisplay: React.FC<ImageDisplayProps> = ({
             'Finalize & Export'
           )}
         </button>
+      )}
+      
+      {/* FIX: Check for onClearFinalizedImage to ensure type safety, as it's now optional. */}
+      {finalizedImage && onClearFinalizedImage && (
+        <div className="relative mt-2">
+            <a
+                href={finalizedImage.url}
+                download={finalizedImage.filename}
+                className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-400 text-gray-900 font-bold py-3 pl-4 pr-10 rounded-lg transition-all duration-300 transform hover:scale-105"
+            >
+                <DownloadIcon className="w-5 h-5" />
+                Download Final Image
+            </a>
+            <button
+                onClick={onClearFinalizedImage}
+                className="absolute top-1/2 right-2 -translate-y-1/2 p-1.5 text-gray-800 hover:text-black rounded-full"
+                aria-label="Clear download link"
+            >
+                <ClearIcon className="w-4 h-4" />
+            </button>
+        </div>
       )}
     </div>
   );
